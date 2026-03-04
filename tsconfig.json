@@ -1,0 +1,17 @@
+{
+  "extends": "ts-config-single-spa",
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
+    "jsx": "react-jsx",
+    "experimentalDecorators": true,
+    "moduleResolution": "node",
+    "declaration": true,
+    "baseUrl": ".",
+    "esModuleInterop": true,
+    "paths": {
+      "saltbox-filesystem/*": ["src/*"]
+    }
+  },
+  "include": ["src/**/*"]
+}

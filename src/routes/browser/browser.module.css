@@ -1,0 +1,19 @@
+.browserLayout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+}
+
+.sidebar {
+  flex: 0 0 180px;
+  padding-right: 16px;
+  border-right: 1px solid var(--ant-color-border, #d9d9d9);
+  overflow-y: auto;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  padding-left: 16px;
+}
