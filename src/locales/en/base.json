@@ -26,5 +26,15 @@
     "hint": "Supports single or multiple file uploads",
     "success": "uploaded successfully",
     "failed": "upload failed"
+  },
+  "editor": {
+    "save": "Save",
+    "saving": "Saving...",
+    "close": "Close",
+    "unsavedChanges": "Unsaved changes",
+    "unsavedWarning": "You have unsaved changes. Close without saving?",
+    "loadError": "Failed to load file",
+    "saveError": "Failed to save file",
+    "saveSuccess": "File saved"
   }
 }

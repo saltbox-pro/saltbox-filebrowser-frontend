@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { FileEntry } from "saltbox-filesystem/store/file-browser-store";
 import { formatFileSize, getFileIcon, getParentPath } from "saltbox-filesystem/shared/utils";
+import { isTextFile } from "saltbox-filesystem/shared/language-utils";
 import { BreadcrumbNav } from "./breadcrumb-nav";
 import { FileActions } from "./file-actions";
 import styles from "./file-browser.module.css";
@@ -16,6 +17,7 @@ interface FileBrowserProps {
   isLoading: boolean;
   error?: string;
   onNavigate: (path: string) => void;
+  onFileOpen: (name: string) => void;
   onDownload: (name: string) => void;
   onDelete: (name: string) => void;
   onCreateFolder: (name: string) => void;
@@ -28,6 +30,7 @@ export const FileBrowser = observer(({
   isLoading,
   error,
   onNavigate,
+  onFileOpen,
   onDownload,
   onDelete,
   onCreateFolder,
@@ -44,9 +47,11 @@ export const FileBrowser = observer(({
           ? `/${record.name}`
           : `${currentPath}/${record.name}`;
         onNavigate(newPath);
+      } else if (isTextFile(record.name, record.type)) {
+        onFileOpen(record.name);
       }
     },
-    [currentPath, onNavigate],
+    [currentPath, onNavigate, onFileOpen],
   );
 
   const handleCreateFolder = useCallback(() => {
@@ -149,8 +154,8 @@ export const FileBrowser = observer(({
         size="small"
         onRow={(record) => ({
           onClick: () => handleRowClick(record),
-          className: record.isDirectory ? styles.fileRow : undefined,
-          style: record.isDirectory ? { cursor: "pointer" } : undefined,
+          className: (record.isDirectory || isTextFile(record.name, record.type)) ? styles.fileRow : undefined,
+          style: (record.isDirectory || isTextFile(record.name, record.type)) ? { cursor: "pointer" } : undefined,
         })}
         locale={{
           emptyText: (

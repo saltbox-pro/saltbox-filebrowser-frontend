@@ -1,0 +1,31 @@
+.editorContainer {
+  height: 100%;
+  width: 100%;
+}
+
+.loadingContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.errorContainer {
+  padding: 24px;
+  text-align: center;
+  color: #ff4d4f;
+}
+
+.headerInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dirtyIndicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #faad14;
+  display: inline-block;
+}

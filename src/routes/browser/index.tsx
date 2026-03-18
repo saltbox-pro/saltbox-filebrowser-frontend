@@ -4,15 +4,18 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { FileBrowser } from "saltbox-filesystem/components/file-browser/file-browser";
+import { FileEditorModal } from "saltbox-filesystem/components/file-editor/file-editor-modal";
 import { UploadModal } from "saltbox-filesystem/components/upload/upload-modal";
 import { SourceSelector } from "saltbox-filesystem/components/source-selector/source-selector";
 import { fileBrowserStore } from "saltbox-filesystem/store/file-browser-store";
+import { fileEditorStore } from "saltbox-filesystem/store/file-editor-store";
 
 import styles from "./browser.module.css";
 
 export const FileBrowserPage = observer(() => {
   const { t } = useTranslation();
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [editorModalOpen, setEditorModalOpen] = useState(false);
 
   useEffect(() => {
     fileBrowserStore.loadSources().then(() => {
@@ -26,6 +29,19 @@ export const FileBrowserPage = observer(() => {
 
   const handleSourceChange = useCallback((source: string) => {
     fileBrowserStore.loadDirectory(source, "/");
+  }, []);
+
+  const handleFileOpen = useCallback((name: string) => {
+    const fullPath = fileBrowserStore.currentPath === "/"
+      ? `/${name}`
+      : `${fileBrowserStore.currentPath}/${name}`;
+    fileEditorStore.loadFile(fileBrowserStore.currentSource, fullPath);
+    setEditorModalOpen(true);
+  }, []);
+
+  const handleEditorClose = useCallback(() => {
+    setEditorModalOpen(false);
+    fileEditorStore.reset();
   }, []);
 
   const handleDownload = useCallback((name: string) => {
@@ -73,6 +89,7 @@ export const FileBrowserPage = observer(() => {
             isLoading={fileBrowserStore.isLoading}
             error={fileBrowserStore.error}
             onNavigate={handleNavigate}
+            onFileOpen={handleFileOpen}
             onDownload={handleDownload}
             onDelete={handleDelete}
             onCreateFolder={handleCreateFolder}
@@ -85,6 +102,11 @@ export const FileBrowserPage = observer(() => {
         open={uploadModalOpen}
         onClose={() => setUploadModalOpen(false)}
         onUpload={handleUpload}
+      />
+
+      <FileEditorModal
+        open={editorModalOpen}
+        onClose={handleEditorClose}
       />
     </>
   );

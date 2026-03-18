@@ -89,9 +89,24 @@ class ApiFilesystemStore {
     return `${this.basePath}/api/raw?${params}`;
   }
 
+  async getFileContent(source: string, filePath: string): Promise<string> {
+    const url = this.buildDownloadUrl(source, filePath);
+    const response = await fetch(url, {
+      headers: this.authHeaders,
+    });
+    if (!response.ok) throw new Error(`Failed to fetch file content: ${response.statusText}`);
+    return response.text();
+  }
+
+  async saveFileContent(source: string, filePath: string, content: string): Promise<void> {
+    const fileName = filePath.split("/").pop() || "file";
+    const blob = new Blob([content], { type: "text/plain" });
+    const file = new File([blob], fileName, { type: "text/plain" });
+    await this.createResource(source, filePath, { file, override: true });
+  }
+
   downloadFile(source: string, filePath: string): void {
     const url = this.buildDownloadUrl(source, filePath);
-    console.log(url)
     const link = document.createElement("a");
     link.href = url;
     link.download = "";
