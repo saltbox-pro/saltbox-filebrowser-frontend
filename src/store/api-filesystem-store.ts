@@ -116,4 +116,4 @@ class ApiFilesystemStore {
   }
 }
 
-export const apiFilesystemStore = new ApiFilesystemStore("filesystem");
+export const apiFilesystemStore = new ApiFilesystemStore("filebrowser");
