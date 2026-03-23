@@ -29,7 +29,7 @@ class ApiFilesystemStore {
   async getScopes(): Promise<SourceScope[]> {
     if (!this.basePath) return [];
     const params = new URLSearchParams({ id: "self" });
-    const response = await fetch(`${this.basePath}/api/users?${params}`, {
+    const response = await fetch(`${this.basePath}/public/api/users?${params}`, {
       headers: this.authHeaders,
     });
     if (!response.ok) throw new Error(`Failed to fetch user: ${response.statusText}`);
