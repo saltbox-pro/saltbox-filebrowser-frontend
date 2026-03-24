@@ -176,12 +176,12 @@ class FileBrowserStore {
     await this.loadDirectory();
   }
 
-  downloadItem(name: string): void {
+  async downloadItem(name: string, signal?: AbortSignal): Promise<void> {
     const itemPath = this.currentPath === "/"
       ? `/${name}`
       : `${this.currentPath}/${name}`;
 
-    apiFilesystemStore.downloadFile(this.currentSource, itemPath);
+    await apiFilesystemStore.downloadFile(this.currentSource, itemPath, signal);
   }
 
   private mapToEntries(data: FileInfo | undefined): FileEntry[] {

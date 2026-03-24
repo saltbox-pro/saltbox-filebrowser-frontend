@@ -31,6 +31,12 @@
     "clearFinished": "Clear finished",
     "cancelled": "Cancelled"
   },
+  "download": {
+    "started": "Downloading file",
+    "success": "File downloaded",
+    "error": "Download failed",
+    "cancelled": "Download cancelled"
+  },
   "editor": {
     "save": "Save",
     "saving": "Saving...",

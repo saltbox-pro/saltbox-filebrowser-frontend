@@ -157,14 +157,25 @@ class ApiFilesystemStore {
     await this.createResource(source, filePath, { file, override: true });
   }
 
-  downloadFile(source: string, filePath: string): void {
+  async downloadFile(source: string, filePath: string, signal?: AbortSignal): Promise<void> {
     const url = this.buildDownloadUrl(source, filePath);
+    const response = await fetch(url, {
+      headers: this.authHeaders,
+      signal,
+    });
+    if (!response.ok) throw new Error(`Failed to download file: ${response.statusText}`);
+
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const fileName = filePath.split("/").pop() || "download";
+
     const link = document.createElement("a");
-    link.href = url;
-    link.download = "";
+    link.href = blobUrl;
+    link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(blobUrl);
   }
 }
 

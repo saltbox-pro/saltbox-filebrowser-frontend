@@ -1,4 +1,5 @@
 import { PageHeader } from "@saltbox/saltbox-frontend-common";
+import { notification, Spin } from "antd";
 import { observer } from "mobx-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -14,6 +15,7 @@ import styles from "./browser.module.css";
 
 export const FileBrowserPage = observer(() => {
   const { t } = useTranslation();
+  const [notificationApi, contextHolder] = notification.useNotification();
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [editorModalOpen, setEditorModalOpen] = useState(false);
 
@@ -44,9 +46,44 @@ export const FileBrowserPage = observer(() => {
     fileEditorStore.reset();
   }, []);
 
-  const handleDownload = useCallback((name: string) => {
-    fileBrowserStore.downloadItem(name);
-  }, []);
+  const handleDownload = useCallback(async (name: string) => {
+    const key = `download-${name}`;
+    const controller = new AbortController();
+    notificationApi.info({
+      key,
+      message: t("download.started"),
+      description: name,
+      placement: "bottomRight",
+      duration: 0,
+      icon: <Spin size="small" />,
+      onClose: () => controller.abort(),
+    });
+    try {
+      await fileBrowserStore.downloadItem(name, controller.signal);
+      notificationApi.success({
+        key,
+        message: t("download.success"),
+        description: name,
+        placement: "bottomRight",
+      });
+    } catch (e: any) {
+      if (e.name === "AbortError") {
+        notificationApi.info({
+          key,
+          message: t("download.cancelled"),
+          description: name,
+          placement: "bottomRight",
+        });
+      } else {
+        notificationApi.error({
+          key,
+          message: t("download.error"),
+          description: name,
+          placement: "bottomRight",
+        });
+      }
+    }
+  }, [t, notificationApi]);
 
   const handleDelete = useCallback(async (name: string) => {
     try {
@@ -70,6 +107,7 @@ export const FileBrowserPage = observer(() => {
 
   return (
     <>
+      {contextHolder}
       <PageHeader title={t("browser.title")} />
 
       <div className={styles.browserLayout}>
