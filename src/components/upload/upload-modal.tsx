@@ -56,14 +56,7 @@ export const UploadModal = observer(({
       destroyOnHidden={false}
       footer={
         uploads.size > 0 ? (
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <div>
-              {hasFinished && (
-                <Button size="small" onClick={onClearFinished}>
-                  {t("upload.clearFinished")}
-                </Button>
-              )}
-            </div>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <Button onClick={handleClose} disabled={hasActive}>
               {t("actions.close")}
             </Button>
