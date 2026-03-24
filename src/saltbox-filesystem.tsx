@@ -31,10 +31,10 @@ const init = (authStore, services, localeStore, pluginsStore) => {
   });
 };
 
-export const menuConfig = {
+export const settingsConfig = {
   priority: 50,
   key: "filesystem-module",
-  label: "Filesystem",
+  label: "File Manager",
   children: [
     {
       key: "filesystem-browser",
@@ -51,6 +51,6 @@ export const saltboxModule = {
   name,
   path,
   plugins,
-  menuConfig,
+  settingsConfig,
   init,
 };
