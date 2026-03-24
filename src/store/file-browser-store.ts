@@ -1,7 +1,9 @@
-import { action, makeObservable, observable, runInAction } from "mobx";
+import { action, computed, makeObservable, observable, runInAction } from "mobx";
 
 import { FileInfo, SourceScope } from "saltbox-filesystem/shared/types";
 import { apiFilesystemStore } from "./api-filesystem-store";
+
+const CHUNK_THRESHOLD = 5 * 1024 * 1024; // 5 MB
 
 export interface FileEntry {
   name: string;
@@ -9,6 +11,15 @@ export interface FileEntry {
   modified: string;
   type: string;
   isDirectory: boolean;
+}
+
+export interface UploadProgress {
+  fileName: string;
+  loaded: number;
+  total: number;
+  status: "uploading" | "done" | "error";
+  error?: string;
+  abortController: AbortController;
 }
 
 class FileBrowserStore {
@@ -19,9 +30,14 @@ class FileBrowserStore {
   @observable isLoading: boolean = false;
   @observable sourcesLoading: boolean = false;
   @observable error: string | undefined;
+  @observable uploads: Map<string, UploadProgress> = new Map();
 
   constructor() {
     makeObservable(this);
+  }
+
+  @computed get hasActiveUploads(): boolean {
+    return Array.from(this.uploads.values()).some((u) => u.status === "uploading");
   }
 
   @action
@@ -82,8 +98,72 @@ class FileBrowserStore {
       ? `/${file.name}`
       : `${this.currentPath}/${file.name}`;
 
-    await apiFilesystemStore.createResource(this.currentSource, filePath, { file, override });
-    await this.loadDirectory();
+    const uploadId = `${file.name}-${Date.now()}`;
+    const abortController = new AbortController();
+
+    runInAction(() => {
+      this.uploads.set(uploadId, {
+        fileName: file.name,
+        loaded: 0,
+        total: file.size,
+        status: "uploading",
+        abortController,
+      });
+    });
+
+    try {
+      if (file.size <= CHUNK_THRESHOLD) {
+        await apiFilesystemStore.createResource(this.currentSource, filePath, { file, override });
+      } else {
+        await apiFilesystemStore.uploadFileChunked(this.currentSource, filePath, {
+          file,
+          override,
+          signal: abortController.signal,
+          onProgress: (loaded) => {
+            runInAction(() => {
+              const upload = this.uploads.get(uploadId);
+              if (upload) {
+                upload.loaded = loaded;
+              }
+            });
+          },
+        });
+      }
+      runInAction(() => {
+        const upload = this.uploads.get(uploadId);
+        if (upload) {
+          upload.status = "done";
+          upload.loaded = upload.total;
+        }
+      });
+      await this.loadDirectory();
+    } catch (e: any) {
+      runInAction(() => {
+        const upload = this.uploads.get(uploadId);
+        if (upload) {
+          upload.status = "error";
+          upload.error = e.name === "AbortError" ? "Cancelled" : e.message;
+        }
+      });
+      if (e.name !== "AbortError") throw e;
+    }
+  }
+
+  @action
+  cancelUpload(uploadId: string): void {
+    const upload = this.uploads.get(uploadId);
+    if (upload && upload.status === "uploading") {
+      upload.abortController.abort();
+    }
+  }
+
+  @action
+  clearFinishedUploads(): void {
+    for (const [id, upload] of this.uploads) {
+      if (upload.status !== "uploading") {
+        this.uploads.delete(id);
+      }
+    }
   }
 
   @action

@@ -64,8 +64,8 @@ export const FileBrowserPage = observer(() => {
     }
   }, []);
 
-  const handleUpload = useCallback(async (file: File) => {
-    await fileBrowserStore.uploadFile(file);
+  const handleUpload = useCallback((file: File) => {
+    return fileBrowserStore.uploadFile(file);
   }, []);
 
   return (
@@ -102,6 +102,9 @@ export const FileBrowserPage = observer(() => {
         open={uploadModalOpen}
         onClose={() => setUploadModalOpen(false)}
         onUpload={handleUpload}
+        uploads={fileBrowserStore.uploads}
+        onCancelUpload={(id) => fileBrowserStore.cancelUpload(id)}
+        onClearFinished={() => fileBrowserStore.clearFinishedUploads()}
       />
 
       <FileEditorModal

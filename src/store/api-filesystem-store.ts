@@ -4,6 +4,15 @@ import { FileInfo, SourceScope } from "saltbox-filesystem/shared/types";
 import { appStore } from "./app-store";
 import { envStore } from "./env-store";
 
+const CHUNK_SIZE = 1 * 1024 * 1024; // 5 MB
+
+export interface ChunkedUploadOptions {
+  file: File;
+  override?: boolean;
+  onProgress?: (loaded: number, total: number) => void;
+  signal?: AbortSignal;
+}
+
 class ApiFilesystemStore {
   @observable public serviceName: string;
 
@@ -71,6 +80,49 @@ class ApiFilesystemStore {
       body,
     });
     if (!response.ok) throw new Error(`Failed to create resource: ${response.statusText}`);
+  }
+
+  async uploadFileChunked(
+    source: string,
+    path: string,
+    options: ChunkedUploadOptions,
+  ): Promise<void> {
+    if (!this.basePath) return;
+
+    const { file, override, onProgress, signal } = options;
+    const totalSize = file.size;
+    const params = new URLSearchParams({ source, path });
+    if (override) params.set("override", "true");
+    const url = `${this.basePath}/api/resources?${params}`;
+
+    let offset = 0;
+    while (offset < totalSize) {
+      if (signal?.aborted) {
+        throw new DOMException("Upload cancelled", "AbortError");
+      }
+
+      const end = Math.min(offset + CHUNK_SIZE, totalSize);
+      const chunk = file.slice(offset, end);
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          ...this.authHeaders,
+          "Content-Type": file.type || "application/octet-stream",
+          "X-File-Chunk-Offset": String(offset),
+          "X-File-Total-Size": String(totalSize),
+        },
+        body: chunk,
+        signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to upload chunk at offset ${offset}: ${response.statusText}`);
+      }
+
+      offset = end;
+      onProgress?.(offset, totalSize);
+    }
   }
 
   async deleteResource(source: string, path: string): Promise<void> {

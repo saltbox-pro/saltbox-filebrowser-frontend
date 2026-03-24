@@ -18,6 +18,7 @@
     "createFolder": "Create Folder",
     "create": "Create",
     "cancel": "Cancel",
+    "close": "Close",
     "folderNamePlaceholder": "Folder name"
   },
   "upload": {
@@ -25,7 +26,10 @@
     "dragText": "Click or drag files here to upload",
     "hint": "Supports single or multiple file uploads",
     "success": "uploaded successfully",
-    "failed": "upload failed"
+    "failed": "upload failed",
+    "chunkedProgress": "Large file uploads",
+    "clearFinished": "Clear finished",
+    "cancelled": "Cancelled"
   },
   "editor": {
     "save": "Save",
