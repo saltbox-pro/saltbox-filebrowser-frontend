@@ -21,6 +21,7 @@ interface FileBrowserProps {
   onDownload: (name: string) => void;
   onDelete: (name: string) => void;
   onCreateFolder: (name: string) => void;
+  onCreateFile: (name: string) => void;
   onUploadClick: () => void;
 }
 
@@ -34,11 +35,14 @@ export const FileBrowser = observer(({
   onDownload,
   onDelete,
   onCreateFolder,
+  onCreateFile,
   onUploadClick,
 }: FileBrowserProps) => {
   const { t } = useTranslation();
   const [newFolderModalOpen, setNewFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [newFileModalOpen, setNewFileModalOpen] = useState(false);
+  const [newFileName, setNewFileName] = useState("");
 
   const handleRowClick = useCallback(
     (record: FileEntry) => {
@@ -61,6 +65,14 @@ export const FileBrowser = observer(({
       setNewFolderModalOpen(false);
     }
   }, [newFolderName, onCreateFolder]);
+
+  const handleCreateFile = useCallback(() => {
+    if (newFileName.trim()) {
+      onCreateFile(newFileName.trim());
+      setNewFileName("");
+      setNewFileModalOpen(false);
+    }
+  }, [newFileName, onCreateFile]);
 
   const isRoot = currentPath === "/";
 
@@ -140,6 +152,12 @@ export const FileBrowser = observer(({
           >
             {t("actions.createFolder")}
           </Button>
+          <Button
+            icon={<MatIcon icon="note_add" size="small" />}
+            onClick={() => setNewFileModalOpen(true)}
+          >
+            {t("actions.createFile")}
+          </Button>
         </div>
       </div>
 
@@ -180,6 +198,26 @@ export const FileBrowser = observer(({
           value={newFolderName}
           onChange={(e) => setNewFolderName(e.target.value)}
           onPressEnter={handleCreateFolder}
+          autoFocus
+        />
+      </Modal>
+
+      <Modal
+        title={t("actions.createFile")}
+        open={newFileModalOpen}
+        onOk={handleCreateFile}
+        onCancel={() => {
+          setNewFileModalOpen(false);
+          setNewFileName("");
+        }}
+        okText={t("actions.create")}
+        cancelText={t("actions.cancel")}
+      >
+        <Input
+          placeholder={t("actions.fileNamePlaceholder")}
+          value={newFileName}
+          onChange={(e) => setNewFileName(e.target.value)}
+          onPressEnter={handleCreateFile}
           autoFocus
         />
       </Modal>

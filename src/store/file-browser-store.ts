@@ -93,6 +93,17 @@ class FileBrowserStore {
   }
 
   @action
+  async createFile(name: string): Promise<void> {
+    const filePath = this.currentPath === "/"
+      ? `/${name}`
+      : `${this.currentPath}/${name}`;
+
+    const emptyFile = new File([""], name, { type: "text/plain" });
+    await apiFilesystemStore.createResource(this.currentSource, filePath, { file: emptyFile });
+    await this.loadDirectory();
+  }
+
+  @action
   async uploadFile(file: File, override?: boolean): Promise<void> {
     const filePath = this.currentPath === "/"
       ? `/${file.name}`

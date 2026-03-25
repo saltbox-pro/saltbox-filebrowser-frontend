@@ -101,6 +101,14 @@ export const FileBrowserPage = observer(() => {
     }
   }, []);
 
+  const handleCreateFile = useCallback(async (name: string) => {
+    try {
+      await fileBrowserStore.createFile(name);
+    } catch (e: any) {
+      console.error("Create file failed:", e);
+    }
+  }, []);
+
   const handleUpload = useCallback((file: File) => {
     return fileBrowserStore.uploadFile(file);
   }, []);
@@ -131,6 +139,7 @@ export const FileBrowserPage = observer(() => {
             onDownload={handleDownload}
             onDelete={handleDelete}
             onCreateFolder={handleCreateFolder}
+            onCreateFile={handleCreateFile}
             onUploadClick={() => setUploadModalOpen(true)}
           />
         </main>

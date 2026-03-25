@@ -16,10 +16,12 @@
     "yes": "Да",
     "no": "Нет",
     "createFolder": "Создать папку",
+    "createFile": "Создать файл",
     "create": "Создать",
     "cancel": "Отмена",
     "close": "Закрыть",
-    "folderNamePlaceholder": "Название папки"
+    "folderNamePlaceholder": "Название папки",
+    "fileNamePlaceholder": "Имя файла"
   },
   "upload": {
     "title": "Загрузка файлов",

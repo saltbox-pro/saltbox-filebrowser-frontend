@@ -16,10 +16,12 @@
     "yes": "Yes",
     "no": "No",
     "createFolder": "Create Folder",
+    "createFile": "Create File",
     "create": "Create",
     "cancel": "Cancel",
     "close": "Close",
-    "folderNamePlaceholder": "Folder name"
+    "folderNamePlaceholder": "Folder name",
+    "fileNamePlaceholder": "File name"
   },
   "upload": {
     "title": "Upload Files",
