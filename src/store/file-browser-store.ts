@@ -178,6 +178,19 @@ class FileBrowserStore {
   }
 
   @action
+  async renameItem(oldName: string, newName: string): Promise<void> {
+    const fromPath = this.currentPath === "/"
+      ? `/${oldName}`
+      : `${this.currentPath}/${oldName}`;
+    const toPath = this.currentPath === "/"
+      ? `/${newName}`
+      : `${this.currentPath}/${newName}`;
+
+    await apiFilesystemStore.renameResource(this.currentSource, fromPath, toPath);
+    await this.loadDirectory();
+  }
+
+  @action
   async deleteItem(name: string): Promise<void> {
     const itemPath = this.currentPath === "/"
       ? `/${name}`

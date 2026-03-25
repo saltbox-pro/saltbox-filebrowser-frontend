@@ -6,10 +6,11 @@ interface FileActionsProps {
   name: string;
   isDirectory: boolean;
   onDownload: (name: string) => void;
+  onRename: (name: string) => void;
   onDelete: (name: string) => void;
 }
 
-export const FileActions = ({ name, isDirectory, onDownload, onDelete }: FileActionsProps) => {
+export const FileActions = ({ name, isDirectory, onDownload, onRename, onDelete }: FileActionsProps) => {
   const { t } = useTranslation();
 
   return (
@@ -26,6 +27,16 @@ export const FileActions = ({ name, isDirectory, onDownload, onDelete }: FileAct
           title={t("actions.download")}
         />
       )}
+      <Button
+        type="text"
+        size="small"
+        icon={<MatIcon icon="edit" />}
+        onClick={(e) => {
+          e.stopPropagation();
+          onRename(name);
+        }}
+        title={t("actions.rename")}
+      />
       <Popconfirm
         title={t("actions.deleteConfirm")}
         onConfirm={(e) => {

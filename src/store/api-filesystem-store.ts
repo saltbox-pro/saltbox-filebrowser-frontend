@@ -157,6 +157,20 @@ class ApiFilesystemStore {
     await this.createResource(source, filePath, { file, override: true });
   }
 
+  async renameResource(source: string, fromPath: string, toPath: string): Promise<void> {
+    if (!this.basePath) return;
+    const params = new URLSearchParams({
+      action: "rename",
+      from: `${source}::${fromPath}`,
+      destination: `${source}::${toPath}`,
+    });
+    const response = await fetch(`${this.basePath}/api/resources?${params}`, {
+      method: "PATCH",
+      headers: this.authHeaders,
+    });
+    if (!response.ok) throw new Error(`Failed to rename resource: ${response.statusText}`);
+  }
+
   async downloadFile(source: string, filePath: string, signal?: AbortSignal): Promise<void> {
     const url = this.buildDownloadUrl(source, filePath);
     const response = await fetch(url, {

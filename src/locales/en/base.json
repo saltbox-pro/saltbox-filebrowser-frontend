@@ -20,6 +20,8 @@
     "create": "Create",
     "cancel": "Cancel",
     "close": "Close",
+    "rename": "Rename",
+    "newNamePlaceholder": "New name",
     "folderNamePlaceholder": "Folder name",
     "fileNamePlaceholder": "File name"
   },

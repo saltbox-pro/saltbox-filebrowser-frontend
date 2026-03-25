@@ -20,6 +20,8 @@
     "create": "Создать",
     "cancel": "Отмена",
     "close": "Закрыть",
+    "rename": "Переименовать",
+    "newNamePlaceholder": "Новое имя",
     "folderNamePlaceholder": "Название папки",
     "fileNamePlaceholder": "Имя файла"
   },

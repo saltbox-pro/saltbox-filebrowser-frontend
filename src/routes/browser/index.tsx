@@ -85,6 +85,14 @@ export const FileBrowserPage = observer(() => {
     }
   }, [t, notificationApi]);
 
+  const handleRename = useCallback(async (oldName: string, newName: string) => {
+    try {
+      await fileBrowserStore.renameItem(oldName, newName);
+    } catch (e: any) {
+      console.error("Rename failed:", e);
+    }
+  }, []);
+
   const handleDelete = useCallback(async (name: string) => {
     try {
       await fileBrowserStore.deleteItem(name);
@@ -138,6 +146,7 @@ export const FileBrowserPage = observer(() => {
             onFileOpen={handleFileOpen}
             onDownload={handleDownload}
             onDelete={handleDelete}
+            onRename={handleRename}
             onCreateFolder={handleCreateFolder}
             onCreateFile={handleCreateFile}
             onUploadClick={() => setUploadModalOpen(true)}

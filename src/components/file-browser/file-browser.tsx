@@ -20,6 +20,7 @@ interface FileBrowserProps {
   onFileOpen: (name: string) => void;
   onDownload: (name: string) => void;
   onDelete: (name: string) => void;
+  onRename: (oldName: string, newName: string) => void;
   onCreateFolder: (name: string) => void;
   onCreateFile: (name: string) => void;
   onUploadClick: () => void;
@@ -34,6 +35,7 @@ export const FileBrowser = observer(({
   onFileOpen,
   onDownload,
   onDelete,
+  onRename,
   onCreateFolder,
   onCreateFile,
   onUploadClick,
@@ -43,6 +45,9 @@ export const FileBrowser = observer(({
   const [newFolderName, setNewFolderName] = useState("");
   const [newFileModalOpen, setNewFileModalOpen] = useState(false);
   const [newFileName, setNewFileName] = useState("");
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
+  const [renameOldName, setRenameOldName] = useState("");
+  const [renameNewName, setRenameNewName] = useState("");
 
   const handleRowClick = useCallback(
     (record: FileEntry) => {
@@ -73,6 +78,22 @@ export const FileBrowser = observer(({
       setNewFileModalOpen(false);
     }
   }, [newFileName, onCreateFile]);
+
+  const handleRenameOpen = useCallback((name: string) => {
+    setRenameOldName(name);
+    setRenameNewName(name);
+    setRenameModalOpen(true);
+  }, []);
+
+  const handleRenameConfirm = useCallback(() => {
+    const trimmed = renameNewName.trim();
+    if (trimmed && trimmed !== renameOldName) {
+      onRename(renameOldName, trimmed);
+    }
+    setRenameModalOpen(false);
+    setRenameOldName("");
+    setRenameNewName("");
+  }, [renameOldName, renameNewName, onRename]);
 
   const isRoot = currentPath === "/";
 
@@ -119,6 +140,7 @@ export const FileBrowser = observer(({
           name={record.name}
           isDirectory={record.isDirectory}
           onDownload={onDownload}
+          onRename={handleRenameOpen}
           onDelete={onDelete}
         />
       ),
@@ -218,6 +240,28 @@ export const FileBrowser = observer(({
           value={newFileName}
           onChange={(e) => setNewFileName(e.target.value)}
           onPressEnter={handleCreateFile}
+          autoFocus
+        />
+      </Modal>
+
+      <Modal
+        title={t("actions.rename")}
+        open={renameModalOpen}
+        onOk={handleRenameConfirm}
+        onCancel={() => {
+          setRenameModalOpen(false);
+          setRenameOldName("");
+          setRenameNewName("");
+        }}
+        okText={t("actions.rename")}
+        cancelText={t("actions.cancel")}
+        okButtonProps={{ disabled: !renameNewName.trim() || renameNewName.trim() === renameOldName }}
+      >
+        <Input
+          placeholder={t("actions.newNamePlaceholder")}
+          value={renameNewName}
+          onChange={(e) => setRenameNewName(e.target.value)}
+          onPressEnter={handleRenameConfirm}
           autoFocus
         />
       </Modal>
