@@ -30,7 +30,7 @@ export const FileActions = ({ name, isDirectory, onDownload, onRename, onDelete 
       <Button
         type="text"
         size="small"
-        icon={<MatIcon icon="edit" />}
+        icon={<MatIcon icon="edit_square" />}
         onClick={(e) => {
           e.stopPropagation();
           onRename(name);
