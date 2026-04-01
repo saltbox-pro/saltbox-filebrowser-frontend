@@ -1,6 +1,9 @@
 import { Button, Modal, Spin, Tag, message } from "antd";
-import Editor, { type OnMount } from "@monaco-editor/react";
+import Editor, { loader, type OnMount } from "@monaco-editor/react";
+import * as monaco from "monaco-editor";
 import type { editor } from "monaco-editor";
+
+loader.config({ monaco });
 import { observer } from "mobx-react";
 import { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
