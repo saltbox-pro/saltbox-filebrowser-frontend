@@ -1,7 +1,8 @@
-import { Table, Button, Input, Modal, Empty } from "antd";
-import { MatIcon } from "@saltbox/saltbox-frontend-common";
+import { Button, Input, Modal } from "antd";
+import { FastTableListed, MatIcon, type CellMeta } from "@saltbox/saltbox-frontend-common";
+import { createColumnHelper, type SortingState } from "@tanstack/react-table";
 import { observer } from "mobx-react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { FileEntry } from "saltbox-filesystem/store/file-browser-store";
@@ -10,6 +11,8 @@ import { isTextFile } from "saltbox-filesystem/shared/language-utils";
 import { BreadcrumbNav } from "./breadcrumb-nav";
 import { FileActions } from "./file-actions";
 import styles from "./file-browser.module.css";
+
+const columnHelper = createColumnHelper<FileEntry>();
 
 interface FileBrowserProps {
   currentPath: string;
@@ -96,56 +99,50 @@ export const FileBrowser = observer(({
   }, [renameOldName, renameNewName, onRename]);
 
   const isRoot = currentPath === "/";
+  const [sorting, setSorting] = useState<SortingState>([]);
 
-  const columns = [
-    {
-      title: t("browser.name"),
-      dataIndex: "name",
-      key: "name",
-      sorter: (a: FileEntry, b: FileEntry) => a.name.localeCompare(b.name),
-      render: (name: string, record: FileEntry) => (
+  const columns = useMemo(() => [
+    columnHelper.accessor("name", {
+      header: t("browser.name"),
+      cell: ({ row }) => (
         <span className={styles.fileName}>
-          <span className={record.isDirectory ? styles.folderIcon : styles.fileIcon}>
-            <MatIcon icon={getFileIcon(record.type)} />
+          <span className={row.original.isDirectory ? styles.folderIcon : styles.fileIcon}>
+            <MatIcon icon={getFileIcon(row.original.type)} />
           </span>
-          {name}
+          {row.original.name}
         </span>
       ),
-    },
-    {
-      title: t("browser.size"),
-      dataIndex: "size",
-      key: "size",
-      width: 120,
-      sorter: (a: FileEntry, b: FileEntry) => a.size - b.size,
-      render: (size: number, record: FileEntry) =>
-        record.isDirectory ? "—" : formatFileSize(size),
-    },
-    {
-      title: t("browser.modified"),
-      dataIndex: "modified",
-      key: "modified",
-      width: 200,
-      sorter: (a: FileEntry, b: FileEntry) =>
-        new Date(a.modified).getTime() - new Date(b.modified).getTime(),
-      render: (modified: string) =>
-        modified ? new Date(modified).toLocaleString() : "—",
-    },
-    {
-      title: t("browser.actions"),
-      key: "actions",
-      width: 100,
-      render: (_: any, record: FileEntry) => (
+    }),
+    columnHelper.accessor("size", {
+      header: t("browser.size"),
+      meta: { width: 120 } as CellMeta,
+      cell: ({ row }) =>
+        row.original.isDirectory ? "—" : formatFileSize(row.original.size),
+    }),
+    columnHelper.accessor("modified", {
+      header: t("browser.modified"),
+      meta: { width: 200 } as CellMeta,
+      cell: ({ getValue }) => {
+        const modified = getValue();
+        return modified ? new Date(modified).toLocaleString() : "—";
+      },
+    }),
+    columnHelper.display({
+      id: "actions",
+      header: t("browser.actions"),
+      meta: { width: 100 } as CellMeta,
+      enableSorting: false,
+      cell: ({ row }) => (
         <FileActions
-          name={record.name}
-          isDirectory={record.isDirectory}
+          name={row.original.name}
+          isDirectory={row.original.isDirectory}
           onDownload={onDownload}
           onRename={handleRenameOpen}
           onDelete={onDelete}
         />
       ),
-    },
-  ];
+    }),
+  ], [t, onDownload, handleRenameOpen, onDelete]);
 
   return (
     <div>
@@ -185,23 +182,17 @@ export const FileBrowser = observer(({
 
       {error && <div style={{ color: "red", marginBottom: 16 }}>{error}</div>}
 
-      <Table
-        dataSource={files}
+      <FastTableListed
         columns={columns}
-        loading={isLoading}
-        rowKey="name"
-        pagination={false}
-        size="small"
-        onRow={(record) => ({
-          onClick: () => handleRowClick(record),
-          className: (record.isDirectory || isTextFile(record.name, record.type)) ? styles.fileRow : undefined,
-          style: (record.isDirectory || isTextFile(record.name, record.type)) ? { cursor: "pointer" } : undefined,
-        })}
-        locale={{
-          emptyText: (
-            <Empty description={t("browser.empty")} />
-          ),
-        }}
+        data={files}
+        isLoading={isLoading}
+        isEmpty={!isLoading && files.length === 0}
+        hideFooter
+        sorting={sorting}
+        onSortingChange={setSorting}
+        getRowId={(row) => row.name}
+        onRowClick={(record) => handleRowClick(record)}
+        locale={{ empty: t("browser.empty") }}
       />
 
       <Modal
