@@ -58,7 +58,7 @@ export const UploadModal = observer(({
         uploads.size > 0 ? (
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <Button onClick={handleClose} disabled={hasActive}>
-              {t("actions.close")}
+              {t("actions.cancel")}
             </Button>
           </div>
         ) : null

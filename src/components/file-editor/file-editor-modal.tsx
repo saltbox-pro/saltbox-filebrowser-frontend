@@ -85,7 +85,7 @@ export const FileEditorModal = observer(({ open, onClose }: FileEditorModalProps
   const footer = (
     <>
       <Button onClick={handleClose}>
-        {t("editor.close")}
+        {t("actions.cancel")}
       </Button>
       <Button
         type="primary"
