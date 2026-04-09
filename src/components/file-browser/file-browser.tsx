@@ -130,7 +130,7 @@ export const FileBrowser = observer(({
     columnHelper.display({
       id: "actions",
       header: t("browser.actions"),
-      meta: { width: 100 } as CellMeta,
+      meta: { width: 137 } as CellMeta,
       enableSorting: false,
       cell: ({ row }) => (
         <FileActions
