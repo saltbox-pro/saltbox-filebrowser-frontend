@@ -23,7 +23,8 @@
     "rename": "Rename",
     "newNamePlaceholder": "New name",
     "folderNamePlaceholder": "Folder name",
-    "fileNamePlaceholder": "File name"
+    "fileNamePlaceholder": "File name",
+    "nameRequired": "Name cannot be empty"
   },
   "upload": {
     "title": "Upload Files",

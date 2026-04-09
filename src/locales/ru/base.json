@@ -23,7 +23,8 @@
     "rename": "Переименовать",
     "newNamePlaceholder": "Новое имя",
     "folderNamePlaceholder": "Название папки",
-    "fileNamePlaceholder": "Имя файла"
+    "fileNamePlaceholder": "Имя файла",
+    "nameRequired": "Название не может быть пустым"
   },
   "upload": {
     "title": "Загрузка файлов",

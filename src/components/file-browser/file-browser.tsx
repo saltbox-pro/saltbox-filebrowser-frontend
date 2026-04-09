@@ -46,8 +46,10 @@ export const FileBrowser = observer(({
   const { t } = useTranslation();
   const [newFolderModalOpen, setNewFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [newFolderTouched, setNewFolderTouched] = useState(false);
   const [newFileModalOpen, setNewFileModalOpen] = useState(false);
   const [newFileName, setNewFileName] = useState("");
+  const [newFileTouched, setNewFileTouched] = useState(false);
   const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [renameOldName, setRenameOldName] = useState("");
   const [renameNewName, setRenameNewName] = useState("");
@@ -67,17 +69,21 @@ export const FileBrowser = observer(({
   );
 
   const handleCreateFolder = useCallback(() => {
+    setNewFolderTouched(true);
     if (newFolderName.trim()) {
       onCreateFolder(newFolderName.trim());
       setNewFolderName("");
+      setNewFolderTouched(false);
       setNewFolderModalOpen(false);
     }
   }, [newFolderName, onCreateFolder]);
 
   const handleCreateFile = useCallback(() => {
+    setNewFileTouched(true);
     if (newFileName.trim()) {
       onCreateFile(newFileName.trim());
       setNewFileName("");
+      setNewFileTouched(false);
       setNewFileModalOpen(false);
     }
   }, [newFileName, onCreateFile]);
@@ -202,17 +208,29 @@ export const FileBrowser = observer(({
         onCancel={() => {
           setNewFolderModalOpen(false);
           setNewFolderName("");
+          setNewFolderTouched(false);
         }}
         okText={t("actions.create")}
         cancelText={t("actions.cancel")}
+        okButtonProps={{ disabled: !newFolderName.trim() }}
       >
         <Input
           placeholder={t("actions.folderNamePlaceholder")}
           value={newFolderName}
-          onChange={(e) => setNewFolderName(e.target.value)}
+          status={newFolderTouched && !newFolderName.trim() ? "error" : undefined}
+          onChange={(e) => {
+            setNewFolderName(e.target.value);
+            setNewFolderTouched(true);
+          }}
+          onBlur={() => setNewFolderTouched(true)}
           onPressEnter={handleCreateFolder}
           autoFocus
         />
+        {newFolderTouched && !newFolderName.trim() && (
+          <div style={{ color: "#ff4d4f", fontSize: 12, marginTop: 4 }}>
+            {t("actions.nameRequired")}
+          </div>
+        )}
       </Modal>
 
       <Modal
@@ -222,17 +240,29 @@ export const FileBrowser = observer(({
         onCancel={() => {
           setNewFileModalOpen(false);
           setNewFileName("");
+          setNewFileTouched(false);
         }}
         okText={t("actions.create")}
         cancelText={t("actions.cancel")}
+        okButtonProps={{ disabled: !newFileName.trim() }}
       >
         <Input
           placeholder={t("actions.fileNamePlaceholder")}
           value={newFileName}
-          onChange={(e) => setNewFileName(e.target.value)}
+          status={newFileTouched && !newFileName.trim() ? "error" : undefined}
+          onChange={(e) => {
+            setNewFileName(e.target.value);
+            setNewFileTouched(true);
+          }}
+          onBlur={() => setNewFileTouched(true)}
           onPressEnter={handleCreateFile}
           autoFocus
         />
+        {newFileTouched && !newFileName.trim() && (
+          <div style={{ color: "#ff4d4f", fontSize: 12, marginTop: 4 }}>
+            {t("actions.nameRequired")}
+          </div>
+        )}
       </Modal>
 
       <Modal
