@@ -36,8 +36,8 @@
     "cancelled": "Cancelled"
   },
   "download": {
-    "started": "Downloading file",
-    "success": "File downloaded",
+    "started": "Preparing file for download",
+    "success": "File is ready for download",
     "error": "Download failed",
     "cancelled": "Download cancelled"
   },
