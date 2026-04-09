@@ -1,5 +1,5 @@
-import { Button, Popconfirm, Space } from "antd";
-import { MatIcon } from "@saltbox/saltbox-frontend-common";
+import { DownloadOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { Button, Popconfirm } from "antd";
 import { useTranslation } from "react-i18next";
 
 interface FileActionsProps {
@@ -14,12 +14,12 @@ export const FileActions = ({ name, isDirectory, onDownload, onRename, onDelete 
   const { t } = useTranslation();
 
   return (
-    <Space>
+    <div style={{ display: "flex", gap: "8px" }}>
       {!isDirectory && (
         <Button
-          type="text"
-          size="small"
-          icon={<MatIcon icon="download" />}
+          type="default"
+          icon={<DownloadOutlined />}
+          shape="circle"
           onClick={(e) => {
             e.stopPropagation();
             onDownload(name);
@@ -28,9 +28,9 @@ export const FileActions = ({ name, isDirectory, onDownload, onRename, onDelete 
         />
       )}
       <Button
-        type="text"
-        size="small"
-        icon={<MatIcon icon="edit_square" />}
+        type="default"
+        icon={<EditOutlined />}
+        shape="circle"
         onClick={(e) => {
           e.stopPropagation();
           onRename(name);
@@ -48,14 +48,13 @@ export const FileActions = ({ name, isDirectory, onDownload, onRename, onDelete 
         cancelText={t("actions.no")}
       >
         <Button
-          type="text"
-          size="small"
           danger
-          icon={<MatIcon icon="delete" />}
+          icon={<DeleteOutlined />}
+          shape="circle"
           onClick={(e) => e.stopPropagation()}
           title={t("actions.delete")}
         />
       </Popconfirm>
-    </Space>
+    </div>
   );
 };
