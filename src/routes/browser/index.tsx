@@ -88,34 +88,70 @@ export const FileBrowserPage = observer(() => {
   const handleRename = useCallback(async (oldName: string, newName: string) => {
     try {
       await fileBrowserStore.renameItem(oldName, newName);
-    } catch (e: any) {
-      console.error("Rename failed:", e);
+      notificationApi.success({
+        message: t("notifications.renameSuccess"),
+        description: `${oldName} → ${newName}`,
+        placement: "bottomRight",
+      });
+    } catch {
+      notificationApi.error({
+        message: t("notifications.renameError"),
+        description: oldName,
+        placement: "bottomRight",
+      });
     }
-  }, []);
+  }, [t, notificationApi]);
 
   const handleDelete = useCallback(async (name: string) => {
     try {
       await fileBrowserStore.deleteItem(name);
-    } catch (e: any) {
-      console.error("Delete failed:", e);
+      notificationApi.success({
+        message: t("notifications.deleteSuccess"),
+        description: name,
+        placement: "bottomRight",
+      });
+    } catch {
+      notificationApi.error({
+        message: t("notifications.deleteError"),
+        description: name,
+        placement: "bottomRight",
+      });
     }
-  }, []);
+  }, [t, notificationApi]);
 
   const handleCreateFolder = useCallback(async (name: string) => {
     try {
       await fileBrowserStore.createFolder(name);
-    } catch (e: any) {
-      console.error("Create folder failed:", e);
+      notificationApi.success({
+        message: t("notifications.createFolderSuccess"),
+        description: name,
+        placement: "bottomRight",
+      });
+    } catch {
+      notificationApi.error({
+        message: t("notifications.createFolderError"),
+        description: name,
+        placement: "bottomRight",
+      });
     }
-  }, []);
+  }, [t, notificationApi]);
 
   const handleCreateFile = useCallback(async (name: string) => {
     try {
       await fileBrowserStore.createFile(name);
-    } catch (e: any) {
-      console.error("Create file failed:", e);
+      notificationApi.success({
+        message: t("notifications.createFileSuccess"),
+        description: name,
+        placement: "bottomRight",
+      });
+    } catch {
+      notificationApi.error({
+        message: t("notifications.createFileError"),
+        description: name,
+        placement: "bottomRight",
+      });
     }
-  }, []);
+  }, [t, notificationApi]);
 
   const handleUpload = useCallback((file: File) => {
     return fileBrowserStore.uploadFile(file);

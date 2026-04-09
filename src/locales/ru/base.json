@@ -41,6 +41,16 @@
     "error": "Не удалось скачать файл",
     "cancelled": "Скачивание отменено"
   },
+  "notifications": {
+    "deleteSuccess": "Элемент удалён",
+    "deleteError": "Не удалось удалить элемент",
+    "renameSuccess": "Элемент переименован",
+    "renameError": "Не удалось переименовать элемент",
+    "createFolderSuccess": "Папка создана",
+    "createFolderError": "Не удалось создать папку",
+    "createFileSuccess": "Файл создан",
+    "createFileError": "Не удалось создать файл"
+  },
   "errors": {
     "fetchUser": "Не удалось получить данные пользователя",
     "fetchResource": "Не удалось получить ресурс",

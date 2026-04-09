@@ -41,6 +41,16 @@
     "error": "Download failed",
     "cancelled": "Download cancelled"
   },
+  "notifications": {
+    "deleteSuccess": "Item deleted",
+    "deleteError": "Failed to delete item",
+    "renameSuccess": "Item renamed",
+    "renameError": "Failed to rename item",
+    "createFolderSuccess": "Folder created",
+    "createFolderError": "Failed to create folder",
+    "createFileSuccess": "File created",
+    "createFileError": "Failed to create file"
+  },
   "errors": {
     "fetchUser": "Failed to fetch user",
     "fetchResource": "Failed to fetch resource",
