@@ -41,6 +41,17 @@
     "error": "Download failed",
     "cancelled": "Download cancelled"
   },
+  "errors": {
+    "fetchUser": "Failed to fetch user",
+    "fetchResource": "Failed to fetch resource",
+    "createResource": "Failed to create resource",
+    "uploadChunk": "Failed to upload chunk",
+    "uploadCancelled": "Upload cancelled",
+    "deleteResource": "Failed to delete resource",
+    "fetchFileContent": "Failed to fetch file content",
+    "renameResource": "Failed to rename resource",
+    "downloadFile": "Failed to download file"
+  },
   "editor": {
     "save": "Save",
     "saving": "Saving...",

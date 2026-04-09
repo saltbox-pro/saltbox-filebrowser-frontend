@@ -1,4 +1,5 @@
 import { action, computed, makeObservable, observable, runInAction } from "mobx";
+import i18n from "i18next";
 
 import { FileInfo, SourceScope } from "saltbox-filesystem/shared/types";
 import { apiFilesystemStore } from "./api-filesystem-store";
@@ -153,7 +154,7 @@ class FileBrowserStore {
         const upload = this.uploads.get(uploadId);
         if (upload) {
           upload.status = "error";
-          upload.error = e.name === "AbortError" ? "Cancelled" : e.message;
+          upload.error = e.name === "AbortError" ? i18n.t("upload.cancelled") : e.message;
         }
       });
       if (e.name !== "AbortError") throw e;

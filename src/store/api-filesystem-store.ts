@@ -1,4 +1,5 @@
 import { computed, makeObservable, observable } from "mobx";
+import i18n from "i18next";
 
 import { FileInfo, SourceScope } from "saltbox-filesystem/shared/types";
 import { appStore } from "./app-store";
@@ -41,7 +42,7 @@ class ApiFilesystemStore {
     const response = await fetch(`${this.basePath}/public/api/users?${params}`, {
       headers: this.authHeaders,
     });
-    if (!response.ok) throw new Error(`Failed to fetch user: ${response.statusText}`);
+    if (!response.ok) throw new Error(`${i18n.t("errors.fetchUser")}: ${response.statusText}`);
     const data = await response.json();
     return data?.scopes || [];
   }
@@ -52,7 +53,7 @@ class ApiFilesystemStore {
     const response = await fetch(`${this.basePath}/api/resources?${params}`, {
       headers: this.authHeaders,
     });
-    if (!response.ok) throw new Error(`Failed to fetch resource: ${response.statusText}`);
+    if (!response.ok) throw new Error(`${i18n.t("errors.fetchResource")}: ${response.statusText}`);
     return response.json();
   }
 
@@ -79,7 +80,7 @@ class ApiFilesystemStore {
       headers,
       body,
     });
-    if (!response.ok) throw new Error(`Failed to create resource: ${response.statusText}`);
+    if (!response.ok) throw new Error(`${i18n.t("errors.createResource")}: ${response.statusText}`);
   }
 
   async uploadFileChunked(
@@ -98,7 +99,7 @@ class ApiFilesystemStore {
     let offset = 0;
     while (offset < totalSize) {
       if (signal?.aborted) {
-        throw new DOMException("Upload cancelled", "AbortError");
+        throw new DOMException(i18n.t("errors.uploadCancelled"), "AbortError");
       }
 
       const end = Math.min(offset + CHUNK_SIZE, totalSize);
@@ -117,7 +118,7 @@ class ApiFilesystemStore {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to upload chunk at offset ${offset}: ${response.statusText}`);
+        throw new Error(`${i18n.t("errors.uploadChunk")}: ${response.statusText}`);
       }
 
       offset = end;
@@ -132,7 +133,7 @@ class ApiFilesystemStore {
       method: "DELETE",
       headers: this.authHeaders,
     });
-    if (!response.ok) throw new Error(`Failed to delete resource: ${response.statusText}`);
+    if (!response.ok) throw new Error(`${i18n.t("errors.deleteResource")}: ${response.statusText}`);
   }
 
   buildDownloadUrl(source: string, file: string): string {
@@ -146,7 +147,7 @@ class ApiFilesystemStore {
     const response = await fetch(url, {
       headers: this.authHeaders,
     });
-    if (!response.ok) throw new Error(`Failed to fetch file content: ${response.statusText}`);
+    if (!response.ok) throw new Error(`${i18n.t("errors.fetchFileContent")}: ${response.statusText}`);
     return response.text();
   }
 
@@ -168,7 +169,7 @@ class ApiFilesystemStore {
       method: "PATCH",
       headers: this.authHeaders,
     });
-    if (!response.ok) throw new Error(`Failed to rename resource: ${response.statusText}`);
+    if (!response.ok) throw new Error(`${i18n.t("errors.renameResource")}: ${response.statusText}`);
   }
 
   async downloadFile(source: string, filePath: string, signal?: AbortSignal): Promise<void> {
@@ -177,7 +178,7 @@ class ApiFilesystemStore {
       headers: this.authHeaders,
       signal,
     });
-    if (!response.ok) throw new Error(`Failed to download file: ${response.statusText}`);
+    if (!response.ok) throw new Error(`${i18n.t("errors.downloadFile")}: ${response.statusText}`);
 
     const blob = await response.blob();
     const blobUrl = URL.createObjectURL(blob);
