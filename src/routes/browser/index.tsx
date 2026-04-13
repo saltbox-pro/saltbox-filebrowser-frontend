@@ -1,5 +1,5 @@
 import { PageHeader } from "@saltbox/saltbox-frontend-common";
-import { notification, Spin } from "antd";
+import { message, notification, Spin } from "antd";
 import { observer } from "mobx-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -15,7 +15,8 @@ import styles from "./browser.module.css";
 
 export const FileBrowserPage = observer(() => {
   const { t } = useTranslation();
-  const [notificationApi, contextHolder] = notification.useNotification();
+  const [messageApi, messageContextHolder] = message.useMessage();
+  const [notificationApi, notificationContextHolder] = notification.useNotification();
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [editorModalOpen, setEditorModalOpen] = useState(false);
 
@@ -88,70 +89,38 @@ export const FileBrowserPage = observer(() => {
   const handleRename = useCallback(async (oldName: string, newName: string) => {
     try {
       await fileBrowserStore.renameItem(oldName, newName);
-      notificationApi.success({
-        message: t("notifications.renameSuccess"),
-        description: `${oldName} → ${newName}`,
-        placement: "bottomRight",
-      });
+      messageApi.success(t("notifications.renameSuccess", { name: `${oldName} → ${newName}` }));
     } catch {
-      notificationApi.error({
-        message: t("notifications.renameError"),
-        description: oldName,
-        placement: "bottomRight",
-      });
+      messageApi.error(t("notifications.renameError"));
     }
-  }, [t, notificationApi]);
+  }, [t, messageApi]);
 
   const handleDelete = useCallback(async (name: string) => {
     try {
       await fileBrowserStore.deleteItem(name);
-      notificationApi.success({
-        message: t("notifications.deleteSuccess"),
-        description: name,
-        placement: "bottomRight",
-      });
+      messageApi.success(t("notifications.deleteSuccess", { name }));
     } catch {
-      notificationApi.error({
-        message: t("notifications.deleteError"),
-        description: name,
-        placement: "bottomRight",
-      });
+      messageApi.error(t("notifications.deleteError"));
     }
-  }, [t, notificationApi]);
+  }, [t, messageApi]);
 
   const handleCreateFolder = useCallback(async (name: string) => {
     try {
       await fileBrowserStore.createFolder(name);
-      notificationApi.success({
-        message: t("notifications.createFolderSuccess"),
-        description: name,
-        placement: "bottomRight",
-      });
+      messageApi.success(t("notifications.createFolderSuccess", { name }));
     } catch {
-      notificationApi.error({
-        message: t("notifications.createFolderError"),
-        description: name,
-        placement: "bottomRight",
-      });
+      messageApi.error(t("notifications.createFolderError"));
     }
-  }, [t, notificationApi]);
+  }, [t, messageApi]);
 
   const handleCreateFile = useCallback(async (name: string) => {
     try {
       await fileBrowserStore.createFile(name);
-      notificationApi.success({
-        message: t("notifications.createFileSuccess"),
-        description: name,
-        placement: "bottomRight",
-      });
+      messageApi.success(t("notifications.createFileSuccess", { name }));
     } catch {
-      notificationApi.error({
-        message: t("notifications.createFileError"),
-        description: name,
-        placement: "bottomRight",
-      });
+      messageApi.error(t("notifications.createFileError"));
     }
-  }, [t, notificationApi]);
+  }, [t, messageApi]);
 
   const handleUpload = useCallback((file: File) => {
     return fileBrowserStore.uploadFile(file);
@@ -159,7 +128,8 @@ export const FileBrowserPage = observer(() => {
 
   return (
     <>
-      {contextHolder}
+      {messageContextHolder}
+      {notificationContextHolder}
       <PageHeader title={t("browser.title")} />
 
       <div className={styles.browserLayout}>

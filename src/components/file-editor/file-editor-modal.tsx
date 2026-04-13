@@ -33,6 +33,7 @@ interface FileEditorModalProps {
 
 export const FileEditorModal = observer(({ open, onClose }: FileEditorModalProps) => {
   const { t } = useTranslation();
+  const [messageApi, contextHolder] = message.useMessage();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {
@@ -41,12 +42,14 @@ export const FileEditorModal = observer(({ open, onClose }: FileEditorModalProps
       if (fileEditorStore.isDirty && !fileEditorStore.isSaving) {
         fileEditorStore.saveFile().then(() => {
           if (!fileEditorStore.saveError) {
-            message.success(t("editor.saveSuccess"));
+            messageApi.success(t("editor.saveSuccess"));
+          } else {
+            messageApi.error(t("editor.saveError"));
           }
         });
       }
     });
-  }, [t]);
+  }, [t, messageApi]);
 
   const handleChange = useCallback((value: string | undefined) => {
     fileEditorStore.updateContent(value ?? "");
@@ -55,11 +58,11 @@ export const FileEditorModal = observer(({ open, onClose }: FileEditorModalProps
   const handleSave = useCallback(async () => {
     await fileEditorStore.saveFile();
     if (!fileEditorStore.saveError) {
-      message.success(t("editor.saveSuccess"));
+      messageApi.success(t("editor.saveSuccess"));
     } else {
-      message.error(t("editor.saveError"));
+      messageApi.error(t("editor.saveError"));
     }
-  }, [t]);
+  }, [t, messageApi]);
 
   const handleClose = useCallback(() => {
     if (fileEditorStore.isDirty) {
@@ -99,6 +102,8 @@ export const FileEditorModal = observer(({ open, onClose }: FileEditorModalProps
   );
 
   return (
+    <>
+    {contextHolder}
     <Modal
       open={open}
       title={title}
@@ -130,5 +135,6 @@ export const FileEditorModal = observer(({ open, onClose }: FileEditorModalProps
         </div>
       )}
     </Modal>
+    </>
   );
 });

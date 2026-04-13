@@ -43,13 +43,13 @@
     "cancelled": "Скачивание отменено"
   },
   "notifications": {
-    "deleteSuccess": "Элемент удалён",
+    "deleteSuccess": "Элемент {{name}} успешно удалён",
     "deleteError": "Не удалось удалить элемент",
-    "renameSuccess": "Элемент переименован",
+    "renameSuccess": "Элемент {{name}} успешно переименован",
     "renameError": "Не удалось переименовать элемент",
-    "createFolderSuccess": "Папка создана",
+    "createFolderSuccess": "Папка {{name}} успешно создана",
     "createFolderError": "Не удалось создать папку",
-    "createFileSuccess": "Файл создан",
+    "createFileSuccess": "Файл {{name}} успешно создан",
     "createFileError": "Не удалось создать файл"
   },
   "errors": {
