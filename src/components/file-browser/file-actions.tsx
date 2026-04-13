@@ -53,20 +53,22 @@ export const FileActions = ({ name, isDirectory, onDownload, onRename, onDelete 
         />
       </div>
 
-      <Modal
-        title={t("actions.delete")}
-        open={isDeleteModalOpen}
-        onOk={() => {
-          onDelete(name);
-          setIsDeleteModalOpen(false);
-        }}
-        onCancel={() => setIsDeleteModalOpen(false)}
-        okText={t("actions.yes")}
-        cancelText={t("actions.cancel")}
-        okButtonProps={{ danger: true }}
-      >
-        <p>{t("actions.deleteConfirm")}</p>
-      </Modal>
+     <div onClick={(e) => e.stopPropagation()}>
+        <Modal
+          title={t("actions.delete")}
+          open={isDeleteModalOpen}
+          onOk={() => {
+            onDelete(name);
+            setIsDeleteModalOpen(false);
+          }}
+          onCancel={() => setIsDeleteModalOpen(false)}
+          okText={t("actions.yes")}
+          cancelText={t("actions.cancel")}
+          okButtonProps={{ danger: true }}
+        >
+          <p>{t("actions.deleteConfirm")}</p>
+        </Modal>
+      </div>
     </>
   );
 };
