@@ -154,10 +154,13 @@ class FileBrowserStore {
         const upload = this.uploads.get(uploadId);
         if (upload) {
           upload.status = "error";
-          upload.error = e.name === "AbortError" ? i18n.t("upload.cancelled") : e.message;
+          upload.error = e.name === "AbortError"
+            ? i18n.t("upload.cancelled")
+            : e instanceof TypeError
+              ? i18n.t("errors.networkError")
+              : e.message;
         }
       });
-      if (e.name !== "AbortError") throw e;
     }
   }
 

@@ -61,7 +61,11 @@
     "deleteResource": "Failed to delete resource",
     "fetchFileContent": "Failed to fetch file content",
     "renameResource": "Failed to rename resource",
-    "downloadFile": "Failed to download file"
+    "downloadFile": "Failed to download file",
+    "conflict": "File already exists",
+    "serverError": "Internal server error",
+    "serviceUnavailable": "Service temporarily unavailable",
+    "networkError": "No connection to server"
   },
   "editor": {
     "save": "Save",

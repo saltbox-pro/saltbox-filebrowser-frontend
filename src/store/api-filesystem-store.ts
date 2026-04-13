@@ -36,13 +36,31 @@ class ApiFilesystemStore {
     return { Authorization: `Bearer ${token}` };
   }
 
+  private throwResponseError(response: Response, defaultKey: string): never {
+    let message: string;
+    switch (response.status) {
+      case 409:
+        message = i18n.t("errors.conflict");
+        break;
+      case 500:
+        message = i18n.t("errors.serverError");
+        break;
+      case 503:
+        message = i18n.t("errors.serviceUnavailable");
+        break;
+      default:
+        message = i18n.t(defaultKey);
+    }
+    throw new Error(message);
+  }
+
   async getScopes(): Promise<SourceScope[]> {
     if (!this.basePath) return [];
     const params = new URLSearchParams({ id: "self" });
     const response = await fetch(`${this.basePath}/public/api/users?${params}`, {
       headers: this.authHeaders,
     });
-    if (!response.ok) throw new Error(`${i18n.t("errors.fetchUser")}: ${response.statusText}`);
+    if (!response.ok) this.throwResponseError(response, "errors.fetchUser");
     const data = await response.json();
     return data?.scopes || [];
   }
@@ -53,7 +71,7 @@ class ApiFilesystemStore {
     const response = await fetch(`${this.basePath}/api/resources?${params}`, {
       headers: this.authHeaders,
     });
-    if (!response.ok) throw new Error(`${i18n.t("errors.fetchResource")}: ${response.statusText}`);
+    if (!response.ok) this.throwResponseError(response, "errors.fetchResource");
     return response.json();
   }
 
@@ -80,7 +98,7 @@ class ApiFilesystemStore {
       headers,
       body,
     });
-    if (!response.ok) throw new Error(`${i18n.t("errors.createResource")}: ${response.statusText}`);
+    if (!response.ok) this.throwResponseError(response, "errors.createResource");
   }
 
   async uploadFileChunked(
@@ -118,7 +136,7 @@ class ApiFilesystemStore {
       });
 
       if (!response.ok) {
-        throw new Error(`${i18n.t("errors.uploadChunk")}: ${response.statusText}`);
+        this.throwResponseError(response, "errors.uploadChunk");
       }
 
       offset = end;
@@ -133,7 +151,7 @@ class ApiFilesystemStore {
       method: "DELETE",
       headers: this.authHeaders,
     });
-    if (!response.ok) throw new Error(`${i18n.t("errors.deleteResource")}: ${response.statusText}`);
+    if (!response.ok) this.throwResponseError(response, "errors.deleteResource");
   }
 
   buildDownloadUrl(source: string, file: string): string {
@@ -147,7 +165,7 @@ class ApiFilesystemStore {
     const response = await fetch(url, {
       headers: this.authHeaders,
     });
-    if (!response.ok) throw new Error(`${i18n.t("errors.fetchFileContent")}: ${response.statusText}`);
+    if (!response.ok) this.throwResponseError(response, "errors.fetchFileContent");
     return response.text();
   }
 
@@ -169,7 +187,7 @@ class ApiFilesystemStore {
       method: "PATCH",
       headers: this.authHeaders,
     });
-    if (!response.ok) throw new Error(`${i18n.t("errors.renameResource")}: ${response.statusText}`);
+    if (!response.ok) this.throwResponseError(response, "errors.renameResource");
   }
 
   async downloadFile(source: string, filePath: string, signal?: AbortSignal): Promise<void> {
@@ -178,7 +196,7 @@ class ApiFilesystemStore {
       headers: this.authHeaders,
       signal,
     });
-    if (!response.ok) throw new Error(`${i18n.t("errors.downloadFile")}: ${response.statusText}`);
+    if (!response.ok) this.throwResponseError(response, "errors.downloadFile");
 
     const blob = await response.blob();
     const blobUrl = URL.createObjectURL(blob);
