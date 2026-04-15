@@ -1,3 +1,4 @@
+import { CopyOutlined } from "@ant-design/icons";
 import { Button, Modal, Spin, Tag, message } from "antd";
 import Editor, { loader, type OnMount } from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
@@ -77,10 +78,24 @@ export const FileEditorModal = observer(({ open, onClose }: FileEditorModalProps
     }
   }, [onClose, t]);
 
+  const handleCopySaltPath = useCallback(() => {
+    const saltPath = `salt://${fileEditorStore.filePath.replace(/\/+/g, "/").replace(/^\//, "")}`;
+    navigator.clipboard.writeText(saltPath).then(() => {
+      messageApi.success(t("notifications.saltPathCopied", { path: saltPath }));
+    });
+  }, [t, messageApi]);
+
   const title = (
     <div className={styles.headerInfo}>
       <span>{fileEditorStore.fileName}</span>
       <Tag>{fileEditorStore.language}</Tag>
+      <Button
+        type="text"
+        size="small"
+        icon={<CopyOutlined />}
+        onClick={handleCopySaltPath}
+        title={t("actions.copySaltPath")}
+      />
       {fileEditorStore.isDirty && <span className={styles.dirtyIndicator} title={t("editor.unsavedChanges")} />}
     </div>
   );

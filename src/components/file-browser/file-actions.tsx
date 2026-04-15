@@ -1,24 +1,47 @@
-import { DownloadOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { CopyOutlined, DownloadOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { Modal } from "@saltbox/saltbox-frontend-common";
-import { Button } from "antd";
+import { Button, message } from "antd";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface FileActionsProps {
   name: string;
+  currentPath: string;
   isDirectory: boolean;
   onDownload: (name: string) => void;
   onRename: (name: string) => void;
   onDelete: (name: string) => void;
 }
 
-export const FileActions = ({ name, isDirectory, onDownload, onRename, onDelete }: FileActionsProps) => {
+function buildSaltPath(currentPath: string, name: string): string {
+  const fullPath = currentPath === "/" ? `/${name}` : `${currentPath}/${name}`;
+  return `salt://${fullPath.replace(/\/+/g, "/").replace(/^\//, "")}`;
+}
+
+export const FileActions = ({ name, currentPath, isDirectory, onDownload, onRename, onDelete }: FileActionsProps) => {
   const { t } = useTranslation();
+  const [messageApi, contextHolder] = message.useMessage();
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  const handleCopySaltPath = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const saltPath = buildSaltPath(currentPath, name);
+    navigator.clipboard.writeText(saltPath).then(() => {
+      messageApi.success(t("notifications.saltPathCopied", { path: saltPath }));
+    });
+  };
 
   return (
     <>
+      {contextHolder}
       <div style={{ display: "flex", gap: "8px" }}>
+        <Button
+          type="default"
+          icon={<CopyOutlined />}
+          shape="circle"
+          onClick={handleCopySaltPath}
+          title={t("actions.copySaltPath")}
+        />
         {!isDirectory && (
           <Button
             type="default"

@@ -136,11 +136,12 @@ export const FileBrowser = observer(({
     columnHelper.display({
       id: "actions",
       header: t("browser.actions"),
-      meta: { width: 137 } as CellMeta,
+      meta: { width: 170 } as CellMeta,
       enableSorting: false,
       cell: ({ row }) => (
         <FileActions
           name={row.original.name}
+          currentPath={currentPath}
           isDirectory={row.original.isDirectory}
           onDownload={onDownload}
           onRename={handleRenameOpen}
@@ -148,7 +149,7 @@ export const FileBrowser = observer(({
         />
       ),
     }),
-  ], [t, onDownload, handleRenameOpen, onDelete]);
+  ], [t, currentPath, onDownload, handleRenameOpen, onDelete]);
 
   return (
     <div>

@@ -24,7 +24,8 @@
     "newNamePlaceholder": "Новое имя",
     "folderNamePlaceholder": "Название папки",
     "fileNamePlaceholder": "Имя файла",
-    "nameRequired": "Название не может быть пустым"
+    "nameRequired": "Название не может быть пустым",
+    "copySaltPath": "Копировать путь (salt://)"
   },
   "upload": {
     "title": "Загрузка файлов",
@@ -50,7 +51,8 @@
     "createFolderSuccess": "Папка {{name}} успешно создана",
     "createFolderError": "Не удалось создать папку",
     "createFileSuccess": "Файл {{name}} успешно создан",
-    "createFileError": "Не удалось создать файл"
+    "createFileError": "Не удалось создать файл",
+    "saltPathCopied": "Путь скопирован: {{path}}"
   },
   "errors": {
     "fetchUser": "Не удалось получить данные пользователя",

@@ -24,7 +24,8 @@
     "newNamePlaceholder": "New name",
     "folderNamePlaceholder": "Folder name",
     "fileNamePlaceholder": "File name",
-    "nameRequired": "Name cannot be empty"
+    "nameRequired": "Name cannot be empty",
+    "copySaltPath": "Copy path (salt://)"
   },
   "upload": {
     "title": "Upload Files",
@@ -50,7 +51,8 @@
     "createFolderSuccess": "Folder {{name}} created successfully",
     "createFolderError": "Failed to create folder",
     "createFileSuccess": "File {{name}} created successfully",
-    "createFileError": "Failed to create file"
+    "createFileError": "Failed to create file",
+    "saltPathCopied": "Path copied: {{path}}"
   },
   "errors": {
     "fetchUser": "Failed to fetch user",
