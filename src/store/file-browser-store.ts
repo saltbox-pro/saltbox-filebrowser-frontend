@@ -63,21 +63,23 @@ class FileBrowserStore {
 
   @action
   async loadDirectory(source?: string, path?: string): Promise<void> {
-    if (source) this.currentSource = source;
-    if (path !== undefined) this.currentPath = path;
+    const targetSource = source ?? this.currentSource;
+    const targetPath = path ?? this.currentPath;
 
     this.isLoading = true;
     this.error = undefined;
 
     try {
-      const data = await apiFilesystemStore.getResource(this.currentSource, this.currentPath);
+      const data = await apiFilesystemStore.getResource(targetSource, targetPath);
       runInAction(() => {
+        this.currentSource = targetSource;
+        this.currentPath = targetPath;
         this.files = this.mapToEntries(data);
         this.isLoading = false;
       });
     } catch (e: any) {
       runInAction(() => {
-        this.error = e.message;
+        this.error = e instanceof TypeError ? i18n.t("errors.networkError") : e.message;
         this.isLoading = false;
       });
     }

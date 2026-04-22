@@ -1,4 +1,4 @@
-import { Button, Input, Modal } from "antd";
+import { Button, Input, Modal, Spin } from "antd";
 import { FastTableListed, MatIcon, type CellMeta } from "@saltbox/saltbox-frontend-common";
 import { createColumnHelper, type SortingState } from "@tanstack/react-table";
 import { observer } from "mobx-react";
@@ -153,54 +153,55 @@ export const FileBrowser = observer(({
 
   return (
     <div>
-      <div className={styles.navBar}>
-        <div className={styles.navLeft}>
-          <Button
-            type="text"
-            size="small"
-            icon={<MatIcon icon="arrow_upward" size="small" />}
-            disabled={isRoot}
-            onClick={() => onNavigate(getParentPath(currentPath))}
-          />
-          <BreadcrumbNav currentPath={currentPath} onNavigate={onNavigate} />
+      <Spin spinning={isLoading}>
+        <div className={styles.navBar}>
+          <div className={styles.navLeft}>
+            <Button
+              type="text"
+              size="small"
+              icon={<MatIcon icon="arrow_upward" size="small" />}
+              disabled={isRoot}
+              onClick={() => onNavigate(getParentPath(currentPath))}
+            />
+            <BreadcrumbNav currentPath={currentPath} onNavigate={onNavigate} />
+          </div>
+          <div className={styles.navRight}>
+            <Button
+              type="primary"
+              icon={<MatIcon icon="upload_file" size="small" />}
+              onClick={onUploadClick}
+            >
+              {t("actions.upload")}
+            </Button>
+            <Button
+              icon={<MatIcon icon="create_new_folder" size="small" />}
+              onClick={() => setNewFolderModalOpen(true)}
+            >
+              {t("actions.createFolder")}
+            </Button>
+            <Button
+              icon={<MatIcon icon="note_add" size="small" />}
+              onClick={() => setNewFileModalOpen(true)}
+            >
+              {t("actions.createFile")}
+            </Button>
+          </div>
         </div>
-        <div className={styles.navRight}>
-          <Button
-            type="primary"
-            icon={<MatIcon icon="upload_file" size="small" />}
-            onClick={onUploadClick}
-          >
-            {t("actions.upload")}
-          </Button>
-          <Button
-            icon={<MatIcon icon="create_new_folder" size="small" />}
-            onClick={() => setNewFolderModalOpen(true)}
-          >
-            {t("actions.createFolder")}
-          </Button>
-          <Button
-            icon={<MatIcon icon="note_add" size="small" />}
-            onClick={() => setNewFileModalOpen(true)}
-          >
-            {t("actions.createFile")}
-          </Button>
-        </div>
-      </div>
 
-      {error && <div style={{ color: "red", marginBottom: 16 }}>{error}</div>}
+        {error && <div style={{ color: "red", marginBottom: 16 }}>{error}</div>}
 
-      <FastTableListed
-        columns={columns}
-        data={files}
-        isLoading={isLoading}
-        isEmpty={!isLoading && files.length === 0}
-        hideFooter
-        sorting={sorting}
-        onSortingChange={setSorting}
-        getRowId={(row) => row.name}
-        onRowClick={(record) => handleRowClick(record)}
-        locale={{ empty: t("browser.empty") }}
-      />
+        <FastTableListed
+          columns={columns}
+          data={files}
+          isEmpty={!isLoading && files.length === 0}
+          hideFooter
+          sorting={sorting}
+          onSortingChange={setSorting}
+          getRowId={(row) => row.name}
+          onRowClick={(record) => handleRowClick(record)}
+          locale={{ empty: t("browser.empty") }}
+        />
+      </Spin>
 
       <Modal
         title={t("actions.createFolder")}
