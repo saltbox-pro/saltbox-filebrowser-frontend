@@ -1,4 +1,4 @@
-import { PageHeader } from "@saltbox/saltbox-frontend-common";
+import { PageHeader, isGlobalServerError } from "@saltbox/saltbox-frontend-common";
 import { message, notification, Spin } from "antd";
 import { observer } from "mobx-react";
 import { useCallback, useEffect, useState } from "react";
@@ -90,7 +90,8 @@ export const FileBrowserPage = observer(() => {
     try {
       await fileBrowserStore.renameItem(oldName, newName);
       messageApi.success(t("notifications.renameSuccess", { name: `${oldName} → ${newName}` }));
-    } catch {
+    } catch (e) {
+      if (isGlobalServerError(e)) return;
       messageApi.error(t("notifications.renameError"));
     }
   }, [t, messageApi]);
@@ -99,7 +100,8 @@ export const FileBrowserPage = observer(() => {
     try {
       await fileBrowserStore.deleteItem(name);
       messageApi.success(t("notifications.deleteSuccess", { name }));
-    } catch {
+    } catch (e) {
+      if (isGlobalServerError(e)) return;
       messageApi.error(t("notifications.deleteError"));
     }
   }, [t, messageApi]);
@@ -108,7 +110,8 @@ export const FileBrowserPage = observer(() => {
     try {
       await fileBrowserStore.createFolder(name);
       messageApi.success(t("notifications.createFolderSuccess", { name }));
-    } catch {
+    } catch (e) {
+      if (isGlobalServerError(e)) return;
       messageApi.error(t("notifications.createFolderError"));
     }
   }, [t, messageApi]);
@@ -117,7 +120,8 @@ export const FileBrowserPage = observer(() => {
     try {
       await fileBrowserStore.createFile(name);
       messageApi.success(t("notifications.createFileSuccess", { name }));
-    } catch {
+    } catch (e) {
+      if (isGlobalServerError(e)) return;
       messageApi.error(t("notifications.createFileError"));
     }
   }, [t, messageApi]);
