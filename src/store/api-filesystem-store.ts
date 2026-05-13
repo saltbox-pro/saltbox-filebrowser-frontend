@@ -1,3 +1,9 @@
+import {
+  ServerErrorEventDetail,
+  UiEvent,
+  markGlobalServerError,
+  publish,
+} from "@saltbox/saltbox-frontend-common";
 import { computed, makeObservable, observable } from "mobx";
 import i18n from "i18next";
 
@@ -51,7 +57,20 @@ class ApiFilesystemStore {
       default:
         message = i18n.t(defaultKey);
     }
-    throw new Error(message);
+    const isServerError = response.status >= 500 && response.status < 600;
+    if (isServerError) {
+      publish<ServerErrorEventDetail>(UiEvent.ServerError, {
+        status: response.status,
+        statusText: response.statusText || "",
+        message,
+        url: response.url,
+        method: "",
+        timestamp: new Date().toISOString(),
+      });
+    }
+    const error = new Error(message);
+    if (isServerError) markGlobalServerError(error);
+    throw error;
   }
 
   async getScopes(): Promise<SourceScope[]> {
