@@ -27,7 +27,7 @@ const init = (authStore, services, localeStore, pluginsStore) => {
     }
   });
   autorun(() => {
-    i18nStore.currentLanguage = localeStore.currentLocale;
+    i18nStore.setLanguage(localeStore.currentLocale);
   });
 };
 

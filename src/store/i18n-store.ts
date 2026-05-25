@@ -1,55 +1,24 @@
-import { AppLanguage, enCommon, ruCommon } from "@saltbox/saltbox-frontend-common";
-import i18n from "i18next";
-import LanguageDetector from "i18next-browser-languagedetector";
-import { initReactI18next } from "react-i18next";
-
-import enBase from "../locales/en/base.json";
-import ruBase from "../locales/ru/base.json";
-
-const resources = {
-  [AppLanguage.EN]: {
-    base: enBase,
-    common: enCommon,
-  },
-  [AppLanguage.RU]: {
-    base: ruBase,
-    common: ruCommon,
-  },
-};
+import { setDateTimeLocale, AppLanguage } from "@saltbox/saltbox-frontend-common";
+import { makeAutoObservable } from "mobx";
 
 class I18NStore {
   readonly supportedLanguages: Array<AppLanguage> = [AppLanguage.EN, AppLanguage.RU];
+  currentLanguage: AppLanguage = AppLanguage.EN;
 
   constructor() {
-    i18n
-      .use(LanguageDetector)
-      .use(initReactI18next)
-      .init({
-        fallbackLng: AppLanguage.EN,
-        ns: ["base", "common"],
-        defaultNS: "base",
-        debug: false,
-        resources,
-        detection: {
-          order: ["localStorage", "navigator"],
-          caches: ["localStorage"],
-        },
-        interpolation: {
-          escapeValue: false,
-        },
-        supportedLngs: this.supportedLanguages,
-        react: {
-          useSuspense: true,
-        },
-      });
+    makeAutoObservable(this);
+
+    const stored = localStorage.getItem("i18nextLng");
+    if (stored && this.supportedLanguages.includes(stored as AppLanguage)) {
+      this.currentLanguage = stored as AppLanguage;
+    }
+
+    setDateTimeLocale(this.currentLanguage);
   }
 
-  get currentLanguage(): AppLanguage {
-    return i18n.language as AppLanguage;
-  }
-
-  set currentLanguage(language: AppLanguage) {
-    i18n.changeLanguage(language);
+  setLanguage(language: AppLanguage) {
+    this.currentLanguage = language;
+    setDateTimeLocale(language);
   }
 }
 
