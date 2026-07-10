@@ -1960,10 +1960,10 @@
     tailwind-merge "^3.3.1"
     zod "^4.0.17"
 
-"@saltbox/saltbox-frontend-common@^0.2.28":
-  version "0.2.28"
-  resolved "https://dev.saltbox.pro/api/v4/projects/70/packages/npm/@saltbox/saltbox-frontend-common/-/@saltbox/saltbox-frontend-common-0.2.28.tgz#5090009ec6392fafc23b11a071e36891d67fd126"
-  integrity sha1-UJAAnsY5L6/COxGgceNokdZ/0SY=
+"@saltbox/saltbox-frontend-common@^0.2.33":
+  version "0.2.33"
+  resolved "https://dev.saltbox.pro/api/v4/projects/70/packages/npm/@saltbox/saltbox-frontend-common/-/@saltbox/saltbox-frontend-common-0.2.33.tgz#8be619b5223fc55cde874d9a0a93f445234ad178"
+  integrity sha1-i+YZtSI/xVzeh02aCpP0RSNK0Xg=
   dependencies:
     "@material-symbols/font-300" "^0.38.0"
     "@monaco-editor/react" "^4.7.0"
