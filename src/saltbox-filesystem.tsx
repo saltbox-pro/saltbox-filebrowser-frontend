@@ -1,3 +1,4 @@
+import { createSingleSpaErrorBoundary } from "@saltbox/saltbox-frontend-common";
 import { autorun, runInAction } from "mobx";
 import React from "react";
 import ReactDOMClient from "react-dom/client";
@@ -14,6 +15,7 @@ const filesystemLifecycles = singleSpaReact({
   React,
   ReactDOMClient,
   rootComponent: Root,
+  errorBoundary: createSingleSpaErrorBoundary("File Manager"),
   domElementGetter: () => document.getElementById("app-container"),
 });
 
