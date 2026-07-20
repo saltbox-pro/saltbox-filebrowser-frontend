@@ -191,6 +191,7 @@ export const FileBrowser = observer(({
         {error && <div style={{ color: "red", marginBottom: 16 }}>{error}</div>}
 
         <FastTableListed
+          tableId="filebrowser-files"
           columns={columns}
           data={files}
           isEmpty={!isLoading && files.length === 0}
