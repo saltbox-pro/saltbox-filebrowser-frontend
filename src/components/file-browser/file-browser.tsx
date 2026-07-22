@@ -192,6 +192,7 @@ export const FileBrowser = observer(({
 
         <FastTableListed
           tableId="filebrowser-files"
+          enableColumnResize={false}
           columns={columns}
           data={files}
           isEmpty={!isLoading && files.length === 0}
