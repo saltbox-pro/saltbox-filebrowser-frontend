@@ -1,24 +1,27 @@
-import { Button, Input, Modal, Spin } from "antd";
-import { FastTableListed, MatIcon, type CellMeta } from "@saltbox/saltbox-frontend-common";
-import { createColumnHelper, type SortingState } from "@tanstack/react-table";
-import { observer } from "mobx-react";
-import { useCallback, useMemo, useState } from "react";
+import {
+  FileBrowserActionsPanel,
+  FileBrowserView,
+  type FileBrowserItem,
+  MatIcon,
+} from "@saltbox/saltbox-frontend-common";
+import { Button } from "antd";
+import type { MessageInstance } from "antd/es/message/interface";
+import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { FileEntry } from "saltbox-filesystem/store/file-browser-store";
-import { formatFileSize, getFileIcon, getParentPath } from "saltbox-filesystem/shared/utils";
 import { isTextFile } from "saltbox-filesystem/shared/language-utils";
-import { BreadcrumbNav } from "./breadcrumb-nav";
-import { FileActions } from "./file-actions";
-import styles from "./file-browser.module.css";
+import type { FileEntry } from "saltbox-filesystem/store/file-browser-store";
 
-const columnHelper = createColumnHelper<FileEntry>();
+import { toFileBrowserItem } from "./map-to-file-browser-item";
+import { SaltPathCopyButton } from "./salt-path-copy-button";
 
 interface FileBrowserProps {
   currentPath: string;
   files: FileEntry[];
   isLoading: boolean;
+  disabled?: boolean;
   error?: string;
+  messageApi: MessageInstance;
   onNavigate: (path: string) => void;
   onFileOpen: (name: string) => void;
   onDownload: (name: string) => void;
@@ -29,11 +32,13 @@ interface FileBrowserProps {
   onUploadClick: () => void;
 }
 
-export const FileBrowser = observer(({
+export function FileBrowser({
   currentPath,
   files,
   isLoading,
+  disabled = false,
   error,
+  messageApi,
   onNavigate,
   onFileOpen,
   onDownload,
@@ -42,254 +47,78 @@ export const FileBrowser = observer(({
   onCreateFolder,
   onCreateFile,
   onUploadClick,
-}: FileBrowserProps) => {
+}: FileBrowserProps) {
   const { t } = useTranslation();
-  const [newFolderModalOpen, setNewFolderModalOpen] = useState(false);
-  const [newFolderName, setNewFolderName] = useState("");
-  const [newFolderTouched, setNewFolderTouched] = useState(false);
-  const [newFileModalOpen, setNewFileModalOpen] = useState(false);
-  const [newFileName, setNewFileName] = useState("");
-  const [newFileTouched, setNewFileTouched] = useState(false);
-  const [renameModalOpen, setRenameModalOpen] = useState(false);
-  const [renameOldName, setRenameOldName] = useState("");
-  const [renameNewName, setRenameNewName] = useState("");
+  const emptyLocale = useMemo(() => ({ empty: t("browser.empty") }), [t]);
 
-  const handleRowClick = useCallback(
-    (record: FileEntry) => {
-      if (record.isDirectory) {
-        const newPath = currentPath === "/"
-          ? `/${record.name}`
-          : `${currentPath}/${record.name}`;
-        onNavigate(newPath);
-      } else if (isTextFile(record.name, record.type)) {
-        onFileOpen(record.name);
+  const items = useMemo(
+    () =>
+      files
+        .map((entry) => toFileBrowserItem(entry, currentPath))
+        .filter((item): item is FileBrowserItem => item != null),
+    [currentPath, files]
+  );
+
+  const handleItemClick = useCallback(
+    (item: FileBrowserItem) => {
+      if (item.kind === "directory") {
+        onNavigate(item.path);
+        return;
+      }
+
+      if (isTextFile(item.name, item.iconHint)) {
+        onFileOpen(item.name);
       }
     },
-    [currentPath, onNavigate, onFileOpen],
+    [onFileOpen, onNavigate]
   );
 
-  const handleCreateFolder = useCallback(() => {
-    setNewFolderTouched(true);
-    if (newFolderName.trim()) {
-      onCreateFolder(newFolderName.trim());
-      setNewFolderName("");
-      setNewFolderTouched(false);
-      setNewFolderModalOpen(false);
-    }
-  }, [newFolderName, onCreateFolder]);
-
-  const handleCreateFile = useCallback(() => {
-    setNewFileTouched(true);
-    if (newFileName.trim()) {
-      onCreateFile(newFileName.trim());
-      setNewFileName("");
-      setNewFileTouched(false);
-      setNewFileModalOpen(false);
-    }
-  }, [newFileName, onCreateFile]);
-
-  const handleRenameOpen = useCallback((name: string) => {
-    setRenameOldName(name);
-    setRenameNewName(name);
-    setRenameModalOpen(true);
-  }, []);
-
-  const handleRenameConfirm = useCallback(() => {
-    const trimmed = renameNewName.trim();
-    if (trimmed && trimmed !== renameOldName) {
-      onRename(renameOldName, trimmed);
-    }
-    setRenameModalOpen(false);
-    setRenameOldName("");
-    setRenameNewName("");
-  }, [renameOldName, renameNewName, onRename]);
-
-  const isRoot = currentPath === "/";
-  const [sorting, setSorting] = useState<SortingState>([]);
-
-  const columns = useMemo(() => [
-    columnHelper.accessor("name", {
-      header: t("browser.name"),
-      cell: ({ row }) => (
-        <span className={styles.fileName}>
-          <span className={row.original.isDirectory ? styles.folderIcon : styles.fileIcon}>
-            <MatIcon icon={getFileIcon(row.original.type)} />
-          </span>
-          {row.original.name}
-        </span>
-      ),
-    }),
-    columnHelper.accessor("size", {
-      header: t("browser.size"),
-      meta: { width: 120 } as CellMeta,
-      cell: ({ row }) =>
-        row.original.isDirectory ? "—" : formatFileSize(row.original.size),
-    }),
-    columnHelper.accessor("modified", {
-      header: t("browser.modified"),
-      meta: { width: 200 } as CellMeta,
-      cell: ({ getValue }) => {
-        const modified = getValue();
-        return modified ? new Date(modified).toLocaleString() : "—";
-      },
-    }),
-    columnHelper.display({
-      id: "actions",
-      header: t("browser.actions"),
-      meta: { width: 170 } as CellMeta,
-      enableSorting: false,
-      cell: ({ row }) => (
-        <FileActions
-          name={row.original.name}
-          currentPath={currentPath}
-          isDirectory={row.original.isDirectory}
-          onDownload={onDownload}
-          onRename={handleRenameOpen}
-          onDelete={onDelete}
-        />
-      ),
-    }),
-  ], [t, currentPath, onDownload, handleRenameOpen, onDelete]);
+  const interactionLocked = disabled || isLoading;
 
   return (
-    <div>
-      <Spin spinning={isLoading}>
-        <div className={styles.navBar}>
-          <div className={styles.navLeft}>
-            <Button
-              type="text"
-              size="small"
-              icon={<MatIcon icon="arrow_upward" size="small" />}
-              disabled={isRoot}
-              onClick={() => onNavigate(getParentPath(currentPath))}
-            />
-            <BreadcrumbNav currentPath={currentPath} onNavigate={onNavigate} />
-          </div>
-          <div className={styles.navRight}>
-            <Button
-              type="primary"
-              icon={<MatIcon icon="upload_file" size="small" />}
-              onClick={onUploadClick}
-            >
-              {t("actions.upload")}
-            </Button>
-            <Button
-              icon={<MatIcon icon="create_new_folder" size="small" />}
-              onClick={() => setNewFolderModalOpen(true)}
-            >
-              {t("actions.createFolder")}
-            </Button>
-            <Button
-              icon={<MatIcon icon="note_add" size="small" />}
-              onClick={() => setNewFileModalOpen(true)}
-            >
-              {t("actions.createFile")}
-            </Button>
-          </div>
-        </div>
-
-        {error && <div style={{ color: "red", marginBottom: 16 }}>{error}</div>}
-
-        <FastTableListed
+    <FileBrowserActionsPanel
+      disabled={interactionLocked}
+      onDownload={(item) => onDownload(item.name)}
+      onRename={(item, newName) => onRename(item.name, newName)}
+      onDelete={(item) => onDelete(item.name)}
+      onCreateFolder={onCreateFolder}
+      onCreateFile={onCreateFile}
+      toolbarLeading={
+        <Button
+          type="primary"
+          icon={<MatIcon icon="upload_file" size="small" />}
+          aria-disabled={interactionLocked || undefined}
+          tabIndex={interactionLocked ? -1 : undefined}
+          onClick={() => {
+            if (interactionLocked) {
+              return;
+            }
+            onUploadClick();
+          }}
+        >
+          {t("actions.upload")}
+        </Button>
+      }
+      renderLeadingActions={(item) => (
+        <SaltPathCopyButton currentPath={currentPath} name={item.name} messageApi={messageApi} />
+      )}
+    >
+      {({ toolbar, renderRowActions }) => (
+        <FileBrowserView
           tableId="filebrowser-files"
-          enableColumnResize={false}
-          columns={columns}
-          data={files}
-          isEmpty={!isLoading && files.length === 0}
-          hideFooter
-          sorting={sorting}
-          onSortingChange={setSorting}
-          getRowId={(row) => row.name}
-          onRowClick={(record) => handleRowClick(record)}
-          locale={{ empty: t("browser.empty") }}
+          currentPath={currentPath}
+          items={items}
+          isLoading={isLoading}
+          navigationDisabled={interactionLocked}
+          error={error}
+          locale={emptyLocale}
+          showActionsColumn
+          toolbar={toolbar}
+          onNavigate={onNavigate}
+          onItemClick={handleItemClick}
+          renderRowActions={renderRowActions}
         />
-      </Spin>
-
-      <Modal
-        title={t("actions.createFolder")}
-        open={newFolderModalOpen}
-        onOk={handleCreateFolder}
-        onCancel={() => {
-          setNewFolderModalOpen(false);
-          setNewFolderName("");
-          setNewFolderTouched(false);
-        }}
-        okText={t("actions.create")}
-        cancelText={t("actions.cancel")}
-        okButtonProps={{ disabled: !newFolderName.trim() }}
-      >
-        <Input
-          placeholder={t("actions.folderNamePlaceholder")}
-          value={newFolderName}
-          status={newFolderTouched && !newFolderName.trim() ? "error" : undefined}
-          onChange={(e) => {
-            setNewFolderName(e.target.value);
-            setNewFolderTouched(true);
-          }}
-          onBlur={() => setNewFolderTouched(true)}
-          onPressEnter={handleCreateFolder}
-          autoFocus
-        />
-        {newFolderTouched && !newFolderName.trim() && (
-          <div style={{ color: "#ff4d4f", fontSize: 12, marginTop: 4 }}>
-            {t("actions.nameRequired")}
-          </div>
-        )}
-      </Modal>
-
-      <Modal
-        title={t("actions.createFile")}
-        open={newFileModalOpen}
-        onOk={handleCreateFile}
-        onCancel={() => {
-          setNewFileModalOpen(false);
-          setNewFileName("");
-          setNewFileTouched(false);
-        }}
-        okText={t("actions.create")}
-        cancelText={t("actions.cancel")}
-        okButtonProps={{ disabled: !newFileName.trim() }}
-      >
-        <Input
-          placeholder={t("actions.fileNamePlaceholder")}
-          value={newFileName}
-          status={newFileTouched && !newFileName.trim() ? "error" : undefined}
-          onChange={(e) => {
-            setNewFileName(e.target.value);
-            setNewFileTouched(true);
-          }}
-          onBlur={() => setNewFileTouched(true)}
-          onPressEnter={handleCreateFile}
-          autoFocus
-        />
-        {newFileTouched && !newFileName.trim() && (
-          <div style={{ color: "#ff4d4f", fontSize: 12, marginTop: 4 }}>
-            {t("actions.nameRequired")}
-          </div>
-        )}
-      </Modal>
-
-      <Modal
-        title={t("actions.rename")}
-        open={renameModalOpen}
-        onOk={handleRenameConfirm}
-        onCancel={() => {
-          setRenameModalOpen(false);
-          setRenameOldName("");
-          setRenameNewName("");
-        }}
-        okText={t("actions.rename")}
-        cancelText={t("actions.cancel")}
-        okButtonProps={{ disabled: !renameNewName.trim() || renameNewName.trim() === renameOldName }}
-      >
-        <Input
-          placeholder={t("actions.newNamePlaceholder")}
-          value={renameNewName}
-          onChange={(e) => setRenameNewName(e.target.value)}
-          onPressEnter={handleRenameConfirm}
-          autoFocus
-        />
-      </Modal>
-    </div>
+      )}
+    </FileBrowserActionsPanel>
   );
-});
+}

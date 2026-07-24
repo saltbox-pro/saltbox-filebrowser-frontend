@@ -3,6 +3,7 @@ import { autorun, runInAction } from "mobx";
 import React from "react";
 import ReactDOMClient from "react-dom/client";
 import singleSpaReact from "single-spa-react";
+
 import Root from "./root.component";
 import { appStore } from "./store/app-store";
 import { envStore } from "./store/env-store";
@@ -46,7 +47,6 @@ export const settingsConfig = {
     },
   ],
 };
-
 
 export const saltboxModule = {
   singleSpaLifecycle: filesystemLifecycles,

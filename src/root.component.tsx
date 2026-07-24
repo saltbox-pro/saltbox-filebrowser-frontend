@@ -8,8 +8,8 @@ import { BrowserRouter, Route, Routes, Navigate, useLocation, useNavigate } from
 
 import "@saltbox/saltbox-frontend-common/dist/saltbox-frontend-common.css";
 import { FileBrowserPage } from "saltbox-filesystem/routes/browser";
-import { i18nStore } from "saltbox-filesystem/store/i18n-store";
 import { filesystemResources } from "saltbox-filesystem/store/i18n-resources";
+import { i18nStore } from "saltbox-filesystem/store/i18n-store";
 
 const MODULE_NAME = "File Manager";
 const MAIN_PATH = "/browser/";

@@ -4,10 +4,11 @@ import {
   markGlobalServerError,
   publish,
 } from "@saltbox/saltbox-frontend-common";
-import { computed, makeObservable, observable } from "mobx";
 import i18n from "i18next";
+import { computed, makeObservable, observable } from "mobx";
 
 import { FileInfo, SourceScope } from "saltbox-filesystem/shared/types";
+
 import { appStore } from "./app-store";
 import { envStore } from "./env-store";
 
@@ -97,7 +98,7 @@ class ApiFilesystemStore {
   async createResource(
     source: string,
     path: string,
-    options?: { isDir?: boolean; file?: File; override?: boolean },
+    options?: { isDir?: boolean; file?: File; override?: boolean; signal?: AbortSignal }
   ): Promise<void> {
     if (!this.basePath) return;
     const params = new URLSearchParams({ source, path });
@@ -116,6 +117,7 @@ class ApiFilesystemStore {
       method: "POST",
       headers,
       body,
+      signal: options?.signal,
     });
     if (!response.ok) this.throwResponseError(response, "errors.createResource");
   }
@@ -123,7 +125,7 @@ class ApiFilesystemStore {
   async uploadFileChunked(
     source: string,
     path: string,
-    options: ChunkedUploadOptions,
+    options: ChunkedUploadOptions
   ): Promise<void> {
     if (!this.basePath) return;
 
@@ -174,8 +176,9 @@ class ApiFilesystemStore {
   }
 
   buildDownloadUrl(source: string, file: string): string {
+    const normalized = file.replace(/^\/+/, "");
     const params = new URLSearchParams();
-    params.append("files", `${source}::/${file}`);
+    params.append("files", `${source}::/${normalized}`);
     return `${this.basePath}/api/raw?${params}`;
   }
 

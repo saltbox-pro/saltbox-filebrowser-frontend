@@ -1,4 +1,10 @@
-import { PageHeader, isGlobalServerError } from "@saltbox/saltbox-frontend-common";
+import {
+  FileBrowserLayout,
+  FileBrowserSourceAside,
+  PageHeader,
+  isGlobalServerError,
+  joinPathChild,
+} from "@saltbox/saltbox-frontend-common";
 import { message, notification, Spin } from "antd";
 import { observer } from "mobx-react";
 import { useCallback, useEffect, useState } from "react";
@@ -7,11 +13,10 @@ import { useTranslation } from "react-i18next";
 import { FileBrowser } from "saltbox-filesystem/components/file-browser/file-browser";
 import { FileEditorModal } from "saltbox-filesystem/components/file-editor/file-editor-modal";
 import { UploadModal } from "saltbox-filesystem/components/upload/upload-modal";
-import { SourceSelector } from "saltbox-filesystem/components/source-selector/source-selector";
 import { fileBrowserStore } from "saltbox-filesystem/store/file-browser-store";
 import { fileEditorStore } from "saltbox-filesystem/store/file-editor-store";
 
-import styles from "./browser.module.css";
+import styles from "./browser-page.module.css";
 
 export const FileBrowserPage = observer(() => {
   const { t } = useTranslation();
@@ -21,137 +26,194 @@ export const FileBrowserPage = observer(() => {
   const [editorModalOpen, setEditorModalOpen] = useState(false);
 
   useEffect(() => {
-    fileBrowserStore.loadSources().then(() => {
-      fileBrowserStore.loadDirectory();
+    fileBrowserStore.loadSources().then((ok) => {
+      if (ok) {
+        return fileBrowserStore.loadDirectory();
+      }
+      return undefined;
     });
   }, []);
 
   const handleNavigate = useCallback((path: string) => {
+    if (fileBrowserStore.isBusy) {
+      return;
+    }
     fileBrowserStore.loadDirectory(undefined, path);
   }, []);
 
   const handleSourceChange = useCallback((source: string) => {
+    if (fileBrowserStore.isBusy) {
+      return;
+    }
     fileBrowserStore.loadDirectory(source, "/");
   }, []);
 
-  const handleFileOpen = useCallback((name: string) => {
-    const fullPath = fileBrowserStore.currentPath === "/"
-      ? `/${name}`
-      : `${fileBrowserStore.currentPath}/${name}`;
-    fileEditorStore.loadFile(fileBrowserStore.currentSource, fullPath);
-    setEditorModalOpen(true);
-  }, []);
+  const handleFileOpen = useCallback(
+    (name: string) => {
+      if (fileBrowserStore.isBusy) {
+        return;
+      }
+      try {
+        const fullPath = joinPathChild(fileBrowserStore.currentPath, name);
+        fileEditorStore.loadFile(fileBrowserStore.currentSource, fullPath);
+        setEditorModalOpen(true);
+      } catch (e) {
+        messageApi.error(e instanceof Error ? e.message : t("errors.fetchFileContent"));
+      }
+    },
+    [messageApi, t]
+  );
 
   const handleEditorClose = useCallback(() => {
     setEditorModalOpen(false);
     fileEditorStore.reset();
   }, []);
 
-  const handleDownload = useCallback(async (name: string) => {
-    const key = `download-${name}`;
-    const controller = new AbortController();
-    notificationApi.info({
-      key,
-      message: t("download.started"),
-      description: name,
-      placement: "bottomRight",
-      duration: 0,
-      icon: <Spin size="small" />,
-      onClose: () => controller.abort(),
-    });
-    try {
-      await fileBrowserStore.downloadItem(name, controller.signal);
-      notificationApi.success({
+  const handleDownload = useCallback(
+    async (name: string) => {
+      const key = `download-${name}`;
+      const controller = new AbortController();
+
+      if (fileBrowserStore.isBusy) {
+        messageApi.error(t("errors.operationBusy"));
+        return;
+      }
+
+      notificationApi.info({
         key,
-        message: t("download.success"),
+        message: t("download.started"),
         description: name,
         placement: "bottomRight",
+        duration: 0,
+        icon: <Spin size="small" />,
+        onClose: () => controller.abort(),
       });
-    } catch (e: any) {
-      if (e.name === "AbortError") {
-        notificationApi.info({
+
+      try {
+        await fileBrowserStore.downloadItem(name, controller.signal);
+        notificationApi.success({
           key,
-          message: t("download.cancelled"),
+          message: t("download.success"),
           description: name,
           placement: "bottomRight",
         });
-      } else {
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          notificationApi.info({
+            key,
+            message: t("download.cancelled"),
+            description: name,
+            placement: "bottomRight",
+          });
+          return;
+        }
+        if (isGlobalServerError(error)) {
+          notificationApi.destroy(key);
+          return;
+        }
         notificationApi.error({
           key,
-          message: t("download.error"),
+          message: error instanceof Error ? error.message : t("download.error"),
           description: name,
           placement: "bottomRight",
         });
       }
-    }
-  }, [t, notificationApi]);
+    },
+    [t, messageApi, notificationApi]
+  );
 
-  const handleRename = useCallback(async (oldName: string, newName: string) => {
-    try {
-      await fileBrowserStore.renameItem(oldName, newName);
-      messageApi.success(t("notifications.renameSuccess", { name: `${oldName} → ${newName}` }));
-    } catch (e) {
-      if (isGlobalServerError(e)) return;
-      messageApi.error(t("notifications.renameError"));
-    }
-  }, [t, messageApi]);
+  const handleRename = useCallback(
+    async (oldName: string, newName: string) => {
+      try {
+        await fileBrowserStore.renameItem(oldName, newName);
+        messageApi.success(t("notifications.renameSuccess", { name: `${oldName} → ${newName}` }));
+      } catch (e) {
+        if (!isGlobalServerError(e)) {
+          messageApi.error(e instanceof Error ? e.message : t("notifications.renameError"));
+        }
+        throw e;
+      }
+    },
+    [t, messageApi]
+  );
 
-  const handleDelete = useCallback(async (name: string) => {
-    try {
-      await fileBrowserStore.deleteItem(name);
-      messageApi.success(t("notifications.deleteSuccess", { name }));
-    } catch (e) {
-      if (isGlobalServerError(e)) return;
-      messageApi.error(t("notifications.deleteError"));
-    }
-  }, [t, messageApi]);
+  const handleDelete = useCallback(
+    async (name: string) => {
+      try {
+        await fileBrowserStore.deleteItem(name);
+        messageApi.success(t("notifications.deleteSuccess", { name }));
+      } catch (e) {
+        if (!isGlobalServerError(e)) {
+          messageApi.error(e instanceof Error ? e.message : t("notifications.deleteError"));
+        }
+        throw e;
+      }
+    },
+    [t, messageApi]
+  );
 
-  const handleCreateFolder = useCallback(async (name: string) => {
-    try {
-      await fileBrowserStore.createFolder(name);
-      messageApi.success(t("notifications.createFolderSuccess", { name }));
-    } catch (e) {
-      if (isGlobalServerError(e)) return;
-      messageApi.error(t("notifications.createFolderError"));
-    }
-  }, [t, messageApi]);
+  const handleCreateFolder = useCallback(
+    async (name: string) => {
+      try {
+        await fileBrowserStore.createFolder(name);
+        messageApi.success(t("notifications.createFolderSuccess", { name }));
+      } catch (e) {
+        if (!isGlobalServerError(e)) {
+          messageApi.error(e instanceof Error ? e.message : t("notifications.createFolderError"));
+        }
+        throw e;
+      }
+    },
+    [t, messageApi]
+  );
 
-  const handleCreateFile = useCallback(async (name: string) => {
-    try {
-      await fileBrowserStore.createFile(name);
-      messageApi.success(t("notifications.createFileSuccess", { name }));
-    } catch (e) {
-      if (isGlobalServerError(e)) return;
-      messageApi.error(t("notifications.createFileError"));
-    }
-  }, [t, messageApi]);
+  const handleCreateFile = useCallback(
+    async (name: string) => {
+      try {
+        await fileBrowserStore.createFile(name);
+        messageApi.success(t("notifications.createFileSuccess", { name }));
+      } catch (e) {
+        if (!isGlobalServerError(e)) {
+          messageApi.error(e instanceof Error ? e.message : t("notifications.createFileError"));
+        }
+        throw e;
+      }
+    },
+    [t, messageApi]
+  );
 
   const handleUpload = useCallback((file: File) => {
     return fileBrowserStore.uploadFile(file);
   }, []);
 
   return (
-    <>
+    <div className={styles.page}>
       {messageContextHolder}
       {notificationContextHolder}
       <PageHeader title={t("browser.title")} />
 
-      <div className={styles.browserLayout}>
-        <aside className={styles.sidebar}>
-          <SourceSelector
-            sources={fileBrowserStore.sources}
-            currentSource={fileBrowserStore.currentSource}
-            loading={fileBrowserStore.sourcesLoading}
-            onSourceChange={handleSourceChange}
-          />
-        </aside>
-
-        <main className={styles.content}>
+      <div className={styles.content}>
+        <FileBrowserLayout
+          sidebar={
+            <FileBrowserSourceAside
+              items={fileBrowserStore.sources.map((source) => ({
+                key: source.name,
+                label: source.name,
+              }))}
+              selectedKey={fileBrowserStore.currentSource}
+              loading={fileBrowserStore.sourcesLoading}
+              disabled={fileBrowserStore.isBusy}
+              onChange={handleSourceChange}
+            />
+          }
+        >
           <FileBrowser
             currentPath={fileBrowserStore.currentPath}
             files={fileBrowserStore.files}
             isLoading={fileBrowserStore.isLoading}
+            disabled={fileBrowserStore.isBusy}
             error={fileBrowserStore.error}
+            messageApi={messageApi}
             onNavigate={handleNavigate}
             onFileOpen={handleFileOpen}
             onDownload={handleDownload}
@@ -161,7 +223,7 @@ export const FileBrowserPage = observer(() => {
             onCreateFile={handleCreateFile}
             onUploadClick={() => setUploadModalOpen(true)}
           />
-        </main>
+        </FileBrowserLayout>
       </div>
 
       <UploadModal
@@ -173,10 +235,7 @@ export const FileBrowserPage = observer(() => {
         onClearFinished={() => fileBrowserStore.clearFinishedUploads()}
       />
 
-      <FileEditorModal
-        open={editorModalOpen}
-        onClose={handleEditorClose}
-      />
-    </>
+      <FileEditorModal open={editorModalOpen} onClose={handleEditorClose} />
+    </div>
   );
 });

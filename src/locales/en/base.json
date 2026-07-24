@@ -52,7 +52,8 @@
     "createFolderError": "Failed to create folder",
     "createFileSuccess": "File {{name}} created successfully",
     "createFileError": "Failed to create file",
-    "saltPathCopied": "Path copied: {{path}}"
+    "saltPathCopied": "Path copied: {{path}}",
+    "saltPathCopyError": "Failed to copy path"
   },
   "errors": {
     "fetchUser": "Failed to fetch user",
@@ -67,7 +68,9 @@
     "conflict": "File already exists",
     "serverError": "Internal server error",
     "serviceUnavailable": "Service temporarily unavailable",
-    "networkError": "No connection to server"
+    "networkError": "No connection to server",
+    "operationBusy": "Please wait for the current operation to finish",
+    "noSource": "No file source selected"
   },
   "editor": {
     "save": "Save",

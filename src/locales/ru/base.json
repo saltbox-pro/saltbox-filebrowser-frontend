@@ -52,7 +52,8 @@
     "createFolderError": "Не удалось создать папку",
     "createFileSuccess": "Файл {{name}} успешно создан",
     "createFileError": "Не удалось создать файл",
-    "saltPathCopied": "Путь скопирован: {{path}}"
+    "saltPathCopied": "Путь скопирован: {{path}}",
+    "saltPathCopyError": "Не удалось скопировать путь"
   },
   "errors": {
     "fetchUser": "Не удалось получить данные пользователя",
@@ -67,7 +68,9 @@
     "conflict": "Файл уже существует",
     "serverError": "Внутренняя ошибка сервера",
     "serviceUnavailable": "Сервис временно недоступен",
-    "networkError": "Нет соединения с сервером"
+    "networkError": "Нет соединения с сервером",
+    "operationBusy": "Дождитесь завершения текущей операции",
+    "noSource": "Не выбран источник файлов"
   },
   "editor": {
     "save": "Сохранить",
