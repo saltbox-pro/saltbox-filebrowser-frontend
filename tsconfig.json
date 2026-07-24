@@ -1,6 +1,7 @@
 {
   "extends": "ts-config-single-spa",
   "compilerOptions": {
+    "skipLibCheck": true,
     "target": "es2022",
     "lib": ["es2022", "dom"],
     "jsx": "react-jsx",
@@ -9,6 +10,7 @@
     "declaration": true,
     "baseUrl": ".",
     "esModuleInterop": true,
+    "resolveJsonModule": true,
     "paths": {
       "saltbox-filesystem/*": ["src/*"]
     }
