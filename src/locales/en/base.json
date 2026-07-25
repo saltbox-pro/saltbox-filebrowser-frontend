@@ -1,40 +1,16 @@
 {
   "browser": {
-    "title": "File Manager",
-    "name": "Name",
-    "size": "Size",
-    "modified": "Modified",
-    "actions": "Actions",
-    "empty": "No files",
-    "selectSource": "Select source"
+    "title": "File Manager"
   },
   "actions": {
     "upload": "Upload",
-    "download": "Download",
-    "delete": "Delete",
-    "deleteConfirm": "Are you sure you want to delete this item?",
-    "yes": "Yes",
-    "no": "No",
-    "createFolder": "Create Folder",
-    "createFile": "Create File",
-    "create": "Create",
     "cancel": "Cancel",
-    "close": "Close",
-    "rename": "Rename",
-    "newNamePlaceholder": "New name",
-    "folderNamePlaceholder": "Folder name",
-    "fileNamePlaceholder": "File name",
-    "nameRequired": "Name cannot be empty",
     "copySaltPath": "Copy path (salt://)"
   },
   "upload": {
     "title": "Upload Files",
     "dragText": "Click or drag files here to upload",
     "hint": "Supports single or multiple file uploads",
-    "success": "uploaded successfully",
-    "failed": "upload failed",
-    "chunkedProgress": "Large file uploads",
-    "clearFinished": "Clear finished",
     "cancelled": "Cancelled"
   },
   "download": {
@@ -44,15 +20,7 @@
     "cancelled": "Download cancelled"
   },
   "notifications": {
-    "deleteSuccess": "{{name}} deleted successfully",
-    "deleteError": "Failed to delete item",
-    "renameSuccess": "{{name}} renamed successfully",
-    "renameError": "Failed to rename item",
-    "createFolderSuccess": "Folder {{name}} created successfully",
-    "createFolderError": "Failed to create folder",
-    "createFileSuccess": "File {{name}} created successfully",
-    "createFileError": "Failed to create file",
-    "saltPathCopied": "Path copied: {{path}}",
+    "saltPathCopied": "Path copied: \"{{path}}\"",
     "saltPathCopyError": "Failed to copy path"
   },
   "errors": {
@@ -74,8 +42,6 @@
   },
   "editor": {
     "save": "Save",
-    "saving": "Saving...",
-    "close": "Close",
     "unsavedChanges": "Unsaved changes",
     "unsavedWarning": "You have unsaved changes. Close without saving?",
     "loadError": "Failed to load file",

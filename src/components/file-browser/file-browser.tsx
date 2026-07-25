@@ -25,8 +25,8 @@ interface FileBrowserProps {
   onNavigate: (path: string) => void;
   onFileOpen: (name: string) => void;
   onDownload: (name: string) => void;
-  onDelete: (name: string) => void;
-  onRename: (oldName: string, newName: string) => void;
+  onDelete: (name: string, kind: FileBrowserItem["kind"]) => void;
+  onRename: (oldName: string, newName: string, kind: FileBrowserItem["kind"]) => void;
   onCreateFolder: (name: string) => void;
   onCreateFile: (name: string) => void;
   onUploadClick: () => void;
@@ -49,7 +49,6 @@ export function FileBrowser({
   onUploadClick,
 }: FileBrowserProps) {
   const { t } = useTranslation();
-  const emptyLocale = useMemo(() => ({ empty: t("browser.empty") }), [t]);
 
   const items = useMemo(
     () =>
@@ -79,8 +78,8 @@ export function FileBrowser({
     <FileBrowserActionsPanel
       disabled={interactionLocked}
       onDownload={(item) => onDownload(item.name)}
-      onRename={(item, newName) => onRename(item.name, newName)}
-      onDelete={(item) => onDelete(item.name)}
+      onRename={(item, newName) => onRename(item.name, newName, item.kind)}
+      onDelete={(item) => onDelete(item.name, item.kind)}
       onCreateFolder={onCreateFolder}
       onCreateFile={onCreateFile}
       toolbarLeading={
@@ -111,7 +110,6 @@ export function FileBrowser({
           isLoading={isLoading}
           navigationDisabled={interactionLocked}
           error={error}
-          locale={emptyLocale}
           showActionsColumn
           toolbar={toolbar}
           onNavigate={onNavigate}

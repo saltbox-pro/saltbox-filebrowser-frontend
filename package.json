@@ -60,7 +60,7 @@
     "@babel/plugin-proposal-decorators": "7.28.0",
     "@material-symbols/font-300": "^0.38.0",
     "@monaco-editor/react": "^4.7.0",
-    "@saltbox/saltbox-frontend-common": "^0.3.5",
+    "@saltbox/saltbox-frontend-common": "^0.3.6",
     "@tanstack/react-table": "^8.21.3",
     "antd": "5.26.0",
     "i18next": "25.5.0",

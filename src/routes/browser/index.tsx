@@ -20,6 +20,7 @@ import styles from "./browser-page.module.css";
 
 export const FileBrowserPage = observer(() => {
   const { t } = useTranslation();
+  const { t: tCommon } = useTranslation("common");
   const [messageApi, messageContextHolder] = message.useMessage();
   const [notificationApi, notificationContextHolder] = notification.useNotification();
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -123,63 +124,87 @@ export const FileBrowserPage = observer(() => {
   );
 
   const handleRename = useCallback(
-    async (oldName: string, newName: string) => {
+    async (oldName: string, newName: string, kind: "file" | "directory") => {
+      const kindKey = kind === "directory" ? "directory" : "file";
       try {
         await fileBrowserStore.renameItem(oldName, newName);
-        messageApi.success(t("notifications.renameSuccess", { name: `${oldName} → ${newName}` }));
+        messageApi.success(
+          tCommon(`file-browser.notifications.rename-${kindKey}-success`, {
+            name: `${oldName} → ${newName}`,
+          })
+        );
       } catch (e) {
         if (!isGlobalServerError(e)) {
-          messageApi.error(e instanceof Error ? e.message : t("notifications.renameError"));
+          messageApi.error(
+            e instanceof Error
+              ? e.message
+              : tCommon(`file-browser.notifications.rename-${kindKey}-error`)
+          );
         }
         throw e;
       }
     },
-    [t, messageApi]
+    [tCommon, messageApi]
   );
 
   const handleDelete = useCallback(
-    async (name: string) => {
+    async (name: string, kind: "file" | "directory") => {
+      const kindKey = kind === "directory" ? "directory" : "file";
       try {
         await fileBrowserStore.deleteItem(name);
-        messageApi.success(t("notifications.deleteSuccess", { name }));
+        messageApi.success(
+          tCommon(`file-browser.notifications.delete-${kindKey}-success`, { name })
+        );
       } catch (e) {
         if (!isGlobalServerError(e)) {
-          messageApi.error(e instanceof Error ? e.message : t("notifications.deleteError"));
+          messageApi.error(
+            e instanceof Error
+              ? e.message
+              : tCommon(`file-browser.notifications.delete-${kindKey}-error`)
+          );
         }
         throw e;
       }
     },
-    [t, messageApi]
+    [tCommon, messageApi]
   );
 
   const handleCreateFolder = useCallback(
     async (name: string) => {
       try {
         await fileBrowserStore.createFolder(name);
-        messageApi.success(t("notifications.createFolderSuccess", { name }));
+        messageApi.success(
+          tCommon("file-browser.notifications.create-directory-success", { name })
+        );
       } catch (e) {
         if (!isGlobalServerError(e)) {
-          messageApi.error(e instanceof Error ? e.message : t("notifications.createFolderError"));
+          messageApi.error(
+            e instanceof Error
+              ? e.message
+              : tCommon("file-browser.notifications.create-directory-error")
+          );
         }
         throw e;
       }
     },
-    [t, messageApi]
+    [tCommon, messageApi]
   );
 
   const handleCreateFile = useCallback(
     async (name: string) => {
       try {
         await fileBrowserStore.createFile(name);
-        messageApi.success(t("notifications.createFileSuccess", { name }));
+        messageApi.success(tCommon("file-browser.notifications.create-file-success", { name }));
       } catch (e) {
         if (!isGlobalServerError(e)) {
-          messageApi.error(e instanceof Error ? e.message : t("notifications.createFileError"));
+          messageApi.error(
+            e instanceof Error ? e.message : tCommon("file-browser.notifications.create-file-error")
+          );
         }
         throw e;
       }
     },
-    [t, messageApi]
+    [tCommon, messageApi]
   );
 
   const handleUpload = useCallback((file: File) => {

@@ -1,40 +1,16 @@
 {
   "browser": {
-    "title": "Файловый менеджер",
-    "name": "Имя",
-    "size": "Размер",
-    "modified": "Изменён",
-    "actions": "Действия",
-    "empty": "Нет файлов",
-    "selectSource": "Выберите источник"
+    "title": "Файловый менеджер"
   },
   "actions": {
     "upload": "Загрузить",
-    "download": "Скачать",
-    "delete": "Удалить",
-    "deleteConfirm": "Вы уверены, что хотите удалить этот элемент?",
-    "yes": "Да",
-    "no": "Нет",
-    "createFolder": "Создать папку",
-    "createFile": "Создать файл",
-    "create": "Создать",
     "cancel": "Отмена",
-    "close": "Закрыть",
-    "rename": "Переименовать",
-    "newNamePlaceholder": "Новое имя",
-    "folderNamePlaceholder": "Название папки",
-    "fileNamePlaceholder": "Имя файла",
-    "nameRequired": "Название не может быть пустым",
     "copySaltPath": "Копировать путь (salt://)"
   },
   "upload": {
     "title": "Загрузка файлов",
     "dragText": "Нажмите или перетащите файлы сюда для загрузки",
     "hint": "Поддерживается загрузка одного или нескольких файлов",
-    "success": "загружен успешно",
-    "failed": "не удалось загрузить",
-    "chunkedProgress": "Загрузка больших файлов",
-    "clearFinished": "Очистить завершённые",
     "cancelled": "Отменено"
   },
   "download": {
@@ -44,15 +20,7 @@
     "cancelled": "Скачивание отменено"
   },
   "notifications": {
-    "deleteSuccess": "Элемент {{name}} успешно удалён",
-    "deleteError": "Не удалось удалить элемент",
-    "renameSuccess": "Элемент {{name}} успешно переименован",
-    "renameError": "Не удалось переименовать элемент",
-    "createFolderSuccess": "Папка {{name}} успешно создана",
-    "createFolderError": "Не удалось создать папку",
-    "createFileSuccess": "Файл {{name}} успешно создан",
-    "createFileError": "Не удалось создать файл",
-    "saltPathCopied": "Путь скопирован: {{path}}",
+    "saltPathCopied": "Путь скопирован: \"{{path}}\"",
     "saltPathCopyError": "Не удалось скопировать путь"
   },
   "errors": {
@@ -74,8 +42,6 @@
   },
   "editor": {
     "save": "Сохранить",
-    "saving": "Сохранение...",
-    "close": "Закрыть",
     "unsavedChanges": "Несохранённые изменения",
     "unsavedWarning": "У вас есть несохранённые изменения. Закрыть без сохранения?",
     "loadError": "Не удалось загрузить файл",
