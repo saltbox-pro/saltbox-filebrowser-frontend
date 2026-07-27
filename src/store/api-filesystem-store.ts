@@ -1,24 +1,42 @@
 import {
+  AppLanguage,
   ServerErrorEventDetail,
   UiEvent,
   markGlobalServerError,
   publish,
 } from "@saltbox/saltbox-frontend-common";
-import i18n from "i18next";
 import { computed, makeObservable, observable } from "mobx";
 
+import {
+  FilesystemError,
+  CREATE_ERROR_CODE,
+  NAME_ALREADY_EXISTS_CODE,
+  REMOVE_ERROR_CODE,
+  RENAME_ERROR_CODE,
+  type FileBrowserEntryKind,
+  type FilesystemErrorCode,
+} from "saltbox-filesystem/helpers/filesystem-error";
 import { FileInfo, SourceScope } from "saltbox-filesystem/shared/types";
+
+import enBase from "../locales/en/base.json";
+import ruBase from "../locales/ru/base.json";
 
 import { appStore } from "./app-store";
 import { envStore } from "./env-store";
+import { i18nStore } from "./i18n-store";
 
-const CHUNK_SIZE = 1 * 1024 * 1024; // 5 MB
+const CHUNK_SIZE = 1 * 1024 * 1024;
 
 export interface ChunkedUploadOptions {
   file: File;
   override?: boolean;
   onProgress?: (loaded: number, total: number) => void;
   signal?: AbortSignal;
+}
+
+function getGlobalServerErrorMessage(code: FilesystemErrorCode): string {
+  const errors = i18nStore.currentLanguage === AppLanguage.RU ? ruBase.errors : enBase.errors;
+  return code === "service-unavailable" ? errors.serviceUnavailable : errors.serverError;
 }
 
 class ApiFilesystemStore {
@@ -43,64 +61,79 @@ class ApiFilesystemStore {
     return { Authorization: `Bearer ${token}` };
   }
 
-  private throwResponseError(response: Response, defaultKey: string): never {
-    let message: string;
-    switch (response.status) {
-      case 409:
-        message = i18n.t("errors.conflict");
-        break;
-      case 500:
-        message = i18n.t("errors.serverError");
-        break;
-      case 503:
-        message = i18n.t("errors.serviceUnavailable");
-        break;
-      default:
-        message = i18n.t(defaultKey);
-    }
+  private throwResponseError(
+    response: Response,
+    fallback: FilesystemErrorCode,
+    conflict?: FilesystemErrorCode,
+    method = ""
+  ): never {
+    const code: FilesystemErrorCode =
+      response.status === 409
+        ? (conflict ?? fallback)
+        : response.status === 503
+          ? "service-unavailable"
+          : response.status >= 500 && response.status < 600
+            ? "server-error"
+            : fallback;
+
     const isServerError = response.status >= 500 && response.status < 600;
     if (isServerError) {
       publish<ServerErrorEventDetail>(UiEvent.ServerError, {
         status: response.status,
         statusText: response.statusText || "",
-        message,
+        message: getGlobalServerErrorMessage(code),
         url: response.url,
-        method: "",
+        method,
         timestamp: new Date().toISOString(),
       });
     }
-    const error = new Error(message);
-    if (isServerError) markGlobalServerError(error);
+
+    const error = new FilesystemError(code);
+    if (isServerError) {
+      markGlobalServerError(error);
+    }
     throw error;
   }
 
   async getScopes(): Promise<SourceScope[]> {
-    if (!this.basePath) return [];
+    if (!this.basePath) {
+      throw new FilesystemError("fetch-user");
+    }
     const params = new URLSearchParams({ id: "self" });
     const response = await fetch(`${this.basePath}/public/api/users?${params}`, {
       headers: this.authHeaders,
     });
-    if (!response.ok) this.throwResponseError(response, "errors.fetchUser");
+    if (!response.ok) this.throwResponseError(response, "fetch-user", undefined, "GET");
     const data = await response.json();
     return data?.scopes || [];
   }
 
   async getResource(source: string, path: string): Promise<FileInfo | undefined> {
-    if (!this.basePath) return undefined;
+    if (!this.basePath) {
+      throw new FilesystemError("fetch-resource");
+    }
     const params = new URLSearchParams({ source, path });
     const response = await fetch(`${this.basePath}/api/resources?${params}`, {
       headers: this.authHeaders,
     });
-    if (!response.ok) this.throwResponseError(response, "errors.fetchResource");
+    if (!response.ok) this.throwResponseError(response, "fetch-resource", undefined, "GET");
     return response.json();
   }
 
   async createResource(
     source: string,
     path: string,
-    options?: { isDir?: boolean; file?: File; override?: boolean; signal?: AbortSignal }
+    options?: {
+      isDir?: boolean;
+      file?: File;
+      override?: boolean;
+      signal?: AbortSignal;
+      errorCode?: FilesystemErrorCode;
+    }
   ): Promise<void> {
-    if (!this.basePath) return;
+    if (!this.basePath) {
+      throw new FilesystemError(options?.errorCode ?? CREATE_ERROR_CODE);
+    }
     const params = new URLSearchParams({ source, path });
     if (options?.isDir) params.set("isDir", "true");
     if (options?.override) params.set("override", "true");
@@ -119,7 +152,14 @@ class ApiFilesystemStore {
       body,
       signal: options?.signal,
     });
-    if (!response.ok) this.throwResponseError(response, "errors.createResource");
+    if (!response.ok) {
+      this.throwResponseError(
+        response,
+        options?.errorCode ?? CREATE_ERROR_CODE,
+        options?.override ? undefined : NAME_ALREADY_EXISTS_CODE,
+        "POST"
+      );
+    }
   }
 
   async uploadFileChunked(
@@ -127,7 +167,9 @@ class ApiFilesystemStore {
     path: string,
     options: ChunkedUploadOptions
   ): Promise<void> {
-    if (!this.basePath) return;
+    if (!this.basePath) {
+      throw new FilesystemError("upload-chunk");
+    }
 
     const { file, override, onProgress, signal } = options;
     const totalSize = file.size;
@@ -138,7 +180,7 @@ class ApiFilesystemStore {
     let offset = 0;
     while (offset < totalSize) {
       if (signal?.aborted) {
-        throw new DOMException(i18n.t("errors.uploadCancelled"), "AbortError");
+        throw new DOMException("Aborted", "AbortError");
       }
 
       const end = Math.min(offset + CHUNK_SIZE, totalSize);
@@ -157,7 +199,12 @@ class ApiFilesystemStore {
       });
 
       if (!response.ok) {
-        this.throwResponseError(response, "errors.uploadChunk");
+        this.throwResponseError(
+          response,
+          "upload-chunk",
+          override ? undefined : NAME_ALREADY_EXISTS_CODE,
+          "POST"
+        );
       }
 
       offset = end;
@@ -165,14 +212,18 @@ class ApiFilesystemStore {
     }
   }
 
-  async deleteResource(source: string, path: string): Promise<void> {
-    if (!this.basePath) return;
+  async deleteResource(source: string, path: string, _kind: FileBrowserEntryKind): Promise<void> {
+    if (!this.basePath) {
+      throw new FilesystemError(REMOVE_ERROR_CODE);
+    }
     const params = new URLSearchParams({ source, path });
     const response = await fetch(`${this.basePath}/api/resources?${params}`, {
       method: "DELETE",
       headers: this.authHeaders,
     });
-    if (!response.ok) this.throwResponseError(response, "errors.deleteResource");
+    if (!response.ok) {
+      this.throwResponseError(response, REMOVE_ERROR_CODE, undefined, "DELETE");
+    }
   }
 
   buildDownloadUrl(source: string, file: string): string {
@@ -183,23 +234,40 @@ class ApiFilesystemStore {
   }
 
   async getFileContent(source: string, filePath: string): Promise<string> {
+    if (!this.basePath) {
+      throw new FilesystemError("fetch-file-content");
+    }
     const url = this.buildDownloadUrl(source, filePath);
     const response = await fetch(url, {
       headers: this.authHeaders,
     });
-    if (!response.ok) this.throwResponseError(response, "errors.fetchFileContent");
+    if (!response.ok) this.throwResponseError(response, "fetch-file-content", undefined, "GET");
     return response.text();
   }
 
   async saveFileContent(source: string, filePath: string, content: string): Promise<void> {
+    if (!this.basePath) {
+      throw new FilesystemError("save-file-error");
+    }
     const fileName = filePath.split("/").pop() || "file";
     const blob = new Blob([content], { type: "text/plain" });
     const file = new File([blob], fileName, { type: "text/plain" });
-    await this.createResource(source, filePath, { file, override: true });
+    await this.createResource(source, filePath, {
+      file,
+      override: true,
+      errorCode: "save-file-error",
+    });
   }
 
-  async renameResource(source: string, fromPath: string, toPath: string): Promise<void> {
-    if (!this.basePath) return;
+  async renameResource(
+    source: string,
+    fromPath: string,
+    toPath: string,
+    _kind: FileBrowserEntryKind
+  ): Promise<void> {
+    if (!this.basePath) {
+      throw new FilesystemError(RENAME_ERROR_CODE);
+    }
     const params = new URLSearchParams({
       action: "rename",
       from: `${source}::${fromPath}`,
@@ -209,18 +277,31 @@ class ApiFilesystemStore {
       method: "PATCH",
       headers: this.authHeaders,
     });
-    if (!response.ok) this.throwResponseError(response, "errors.renameResource");
+    if (!response.ok) {
+      this.throwResponseError(response, RENAME_ERROR_CODE, NAME_ALREADY_EXISTS_CODE, "PATCH");
+    }
   }
 
   async downloadFile(source: string, filePath: string, signal?: AbortSignal): Promise<void> {
+    if (!this.basePath) {
+      throw new FilesystemError("download-error");
+    }
     const url = this.buildDownloadUrl(source, filePath);
     const response = await fetch(url, {
       headers: this.authHeaders,
       signal,
     });
-    if (!response.ok) this.throwResponseError(response, "errors.downloadFile");
+    if (!response.ok) this.throwResponseError(response, "download-error", undefined, "GET");
+
+    if (signal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
 
     const blob = await response.blob();
+    if (signal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
     const blobUrl = URL.createObjectURL(blob);
     const fileName = filePath.split("/").pop() || "download";
 
@@ -230,7 +311,9 @@ class ApiFilesystemStore {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(blobUrl);
+    window.setTimeout(() => {
+      URL.revokeObjectURL(blobUrl);
+    }, 60_000);
   }
 }
 

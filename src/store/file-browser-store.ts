@@ -1,12 +1,23 @@
-import { isGlobalServerError, joinPathChild } from "@saltbox/saltbox-frontend-common";
-import i18n from "i18next";
+import {
+  isGlobalServerError,
+  isFileBrowserSafePathSegment,
+  joinFileBrowserPathChild,
+} from "@saltbox/saltbox-frontend-common";
 import { action, computed, makeObservable, observable, runInAction } from "mobx";
 
+import {
+  FilesystemError,
+  LISTING_RELOAD_ERROR_CODE,
+  resolveFilesystemErrorCode,
+  type FileBrowserEntryKind,
+  type FilesystemErrorCode,
+} from "saltbox-filesystem/helpers/filesystem-error";
 import { FileInfo, SourceScope } from "saltbox-filesystem/shared/types";
 
 import { apiFilesystemStore } from "./api-filesystem-store";
+import { fileEditorStore } from "./file-editor-store";
 
-const CHUNK_THRESHOLD = 5 * 1024 * 1024; // 5 MB
+const CHUNK_THRESHOLD = 5 * 1024 * 1024;
 
 export interface FileEntry {
   name: string;
@@ -21,7 +32,7 @@ export interface UploadProgress {
   loaded: number;
   total: number;
   status: "uploading" | "done" | "error";
-  error?: string;
+  error?: FilesystemErrorCode;
   abortController: AbortController;
 }
 
@@ -32,12 +43,14 @@ class FileBrowserStore {
   @observable files: FileEntry[] = [];
   @observable isLoading: boolean = false;
   @observable sourcesLoading: boolean = false;
-  @observable error: string | undefined;
+  @observable error: FilesystemErrorCode | undefined;
   @observable uploads: Map<string, UploadProgress> = new Map();
   @observable private mutationCount = 0;
+  @observable private pendingListingReloadCount = 0;
 
   private loadId = 0;
-  private pendingDirectoryReload = false;
+  private listingInFlight = 0;
+  private listingLoadChain: Promise<void> = Promise.resolve();
 
   constructor() {
     makeObservable(this);
@@ -52,7 +65,17 @@ class FileBrowserStore {
   }
 
   @computed get isBusy(): boolean {
-    return this.isLoading || this.isMutating || this.hasActiveUploads;
+    return (
+      this.isLoading ||
+      this.sourcesLoading ||
+      this.isMutating ||
+      this.hasActiveUploads ||
+      this.pendingListingReloadCount > 0
+    );
+  }
+
+  @computed get hasPendingListingReload(): boolean {
+    return this.pendingListingReloadCount > 0;
   }
 
   @action
@@ -73,7 +96,7 @@ class FileBrowserStore {
       runInAction(() => {
         this.sourcesLoading = false;
         if (!isGlobalServerError(e)) {
-          this.error = e instanceof Error ? e.message : String(e);
+          this.error = resolveFilesystemErrorCode(e, "fetch-user");
         }
       });
       return false;
@@ -82,6 +105,32 @@ class FileBrowserStore {
 
   @action
   async loadDirectory(source?: string, path?: string): Promise<void> {
+    try {
+      await this.enqueueListingLoad(() => this.performLoadDirectory(source, path));
+    } catch {
+      return;
+    }
+  }
+
+  private enqueueListingLoad(task: () => Promise<void>): Promise<void> {
+    runInAction(() => {
+      this.listingInFlight += 1;
+      this.isLoading = true;
+    });
+    const run = this.listingLoadChain.then(task, task).finally(() => {
+      runInAction(() => {
+        this.listingInFlight = Math.max(0, this.listingInFlight - 1);
+        this.isLoading = this.listingInFlight > 0;
+      });
+    });
+    this.listingLoadChain = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
+  }
+
+  private async performLoadDirectory(source?: string, path?: string): Promise<void> {
     const targetSource = source ?? this.currentSource;
     const targetPath = path ?? this.currentPath;
     if (!targetSource) {
@@ -89,8 +138,9 @@ class FileBrowserStore {
     }
 
     const loadId = ++this.loadId;
-    this.isLoading = true;
-    this.error = undefined;
+    runInAction(() => {
+      this.error = undefined;
+    });
 
     try {
       const data = await apiFilesystemStore.getResource(targetSource, targetPath);
@@ -101,44 +151,47 @@ class FileBrowserStore {
         this.currentSource = targetSource;
         this.currentPath = targetPath;
         this.files = this.mapToEntries(data);
-        this.isLoading = false;
       });
     } catch (e: unknown) {
       runInAction(() => {
         if (loadId !== this.loadId) {
           return;
         }
-        this.isLoading = false;
         if (isGlobalServerError(e)) {
           return;
         }
-        this.error =
-          e instanceof TypeError
-            ? i18n.t("errors.networkError")
-            : e instanceof Error
-              ? e.message
-              : String(e);
+        this.error = resolveFilesystemErrorCode(e, "fetch-resource");
       });
+      if (isGlobalServerError(e)) {
+        throw e;
+      }
+      throw new FilesystemError(resolveFilesystemErrorCode(e, "fetch-resource"));
     }
   }
 
   private assertSourceLocation(): { source: string; path: string } {
     if (!this.currentSource) {
-      throw new Error(i18n.t("errors.noSource"));
+      throw new FilesystemError("no-source");
     }
     return { source: this.currentSource, path: this.currentPath };
   }
 
   private assertCanMutate(): { source: string; path: string } {
     if (this.isBusy) {
-      throw new Error(i18n.t("errors.operationBusy"));
+      throw new FilesystemError("operation-busy");
     }
     return this.assertSourceLocation();
   }
 
   private assertCanUpload(): { source: string; path: string } {
-    if (this.isLoading || this.isMutating) {
-      throw new Error(i18n.t("errors.operationBusy"));
+    if (
+      fileEditorStore.isSaving ||
+      this.isLoading ||
+      this.sourcesLoading ||
+      this.isMutating ||
+      this.pendingListingReloadCount > 0
+    ) {
+      throw new FilesystemError("operation-busy");
     }
     return this.assertSourceLocation();
   }
@@ -151,13 +204,25 @@ class FileBrowserStore {
     this.mutationCount = Math.max(0, this.mutationCount - 1);
   };
 
-  private async withMutation(run: (location: { source: string; path: string }) => Promise<void>) {
+  private markListingReloadPending = () => {
+    this.pendingListingReloadCount += 1;
+  };
+
+  private async withMutation(
+    run: (location: { source: string; path: string }) => Promise<void>,
+    options?: { expectListingReload?: boolean }
+  ) {
     const location = this.assertCanMutate();
     runInAction(() => {
       this.beginMutation();
     });
     try {
       await run(location);
+      if (options?.expectListingReload) {
+        runInAction(() => {
+          this.markListingReloadPending();
+        });
+      }
     } finally {
       runInAction(() => {
         this.endMutation();
@@ -166,46 +231,65 @@ class FileBrowserStore {
   }
 
   private async reloadCurrentDirectory(): Promise<void> {
-    if (this.isLoading) {
-      this.pendingDirectoryReload = true;
-      return;
-    }
+    await this.enqueueListingLoad(() =>
+      this.performLoadDirectory(this.currentSource, this.currentPath)
+    );
+  }
 
-    do {
-      this.pendingDirectoryReload = false;
-      await this.loadDirectory(this.currentSource, this.currentPath);
-    } while (this.pendingDirectoryReload);
+  private async reloadAfterMutation(): Promise<void> {
+    try {
+      await this.reloadCurrentDirectory();
+    } catch (error: unknown) {
+      runInAction(() => {
+        this.error = isGlobalServerError(error) ? undefined : LISTING_RELOAD_ERROR_CODE;
+      });
+      if (isGlobalServerError(error)) {
+        throw error;
+      }
+      throw new FilesystemError(LISTING_RELOAD_ERROR_CODE);
+    }
   }
 
   @action
   async createFolder(name: string): Promise<void> {
-    await this.withMutation(async ({ source, path }) => {
-      await apiFilesystemStore.createResource(source, joinPathChild(path, name), {
-        isDir: true,
-      });
-      await this.reloadCurrentDirectory();
-    });
+    await this.withMutation(
+      async ({ source, path }) => {
+        await apiFilesystemStore.createResource(source, joinFileBrowserPathChild(path, name), {
+          isDir: true,
+        });
+      },
+      { expectListingReload: true }
+    );
   }
 
   @action
   async createFile(name: string): Promise<void> {
-    await this.withMutation(async ({ source, path }) => {
-      const emptyFile = new File([""], name, { type: "text/plain" });
-      await apiFilesystemStore.createResource(source, joinPathChild(path, name), {
-        file: emptyFile,
-      });
-      await this.reloadCurrentDirectory();
-    });
+    await this.withMutation(
+      async ({ source, path }) => {
+        const emptyFile = new File([""], name, { type: "text/plain" });
+        await apiFilesystemStore.createResource(source, joinFileBrowserPathChild(path, name), {
+          file: emptyFile,
+        });
+      },
+      { expectListingReload: true }
+    );
   }
 
   @action
   async uploadFile(file: File, override?: boolean): Promise<void> {
-    const uploadId = `${file.name}-${Date.now()}`;
+    const uploadId =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${file.name}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const abortController = new AbortController();
+    let wroteBytes = false;
 
     try {
       const location = this.assertCanUpload();
-      const filePath = joinPathChild(location.path, file.name);
+      if (!isFileBrowserSafePathSegment(file.name)) {
+        throw new FilesystemError("invalid-name");
+      }
+      const filePath = joinFileBrowserPathChild(location.path, file.name);
 
       runInAction(() => {
         this.uploads.set(uploadId, {
@@ -222,21 +306,38 @@ class FileBrowserStore {
           file,
           override,
           signal: abortController.signal,
+          errorCode: "upload-chunk",
         });
+        wroteBytes = true;
       } else {
-        await apiFilesystemStore.uploadFileChunked(location.source, filePath, {
-          file,
-          override,
-          signal: abortController.signal,
-          onProgress: (loaded) => {
-            runInAction(() => {
-              const upload = this.uploads.get(uploadId);
-              if (upload) {
-                upload.loaded = loaded;
-              }
-            });
-          },
-        });
+        try {
+          await apiFilesystemStore.uploadFileChunked(location.source, filePath, {
+            file,
+            override,
+            signal: abortController.signal,
+            onProgress: (loaded) => {
+              wroteBytes = loaded > 0;
+              runInAction(() => {
+                const upload = this.uploads.get(uploadId);
+                if (upload) {
+                  upload.loaded = loaded;
+                }
+              });
+            },
+          });
+          wroteBytes = true;
+        } catch (chunkError: unknown) {
+          if (wroteBytes) {
+            try {
+              await apiFilesystemStore.deleteResource(location.source, filePath, "file");
+            } catch {
+              runInAction(() => {
+                this.markListingReloadPending();
+              });
+            }
+          }
+          throw chunkError;
+        }
       }
       runInAction(() => {
         const upload = this.uploads.get(uploadId);
@@ -244,38 +345,35 @@ class FileBrowserStore {
           upload.status = "done";
           upload.loaded = upload.total;
         }
+        this.markListingReloadPending();
       });
-      await this.reloadCurrentDirectory();
     } catch (e: unknown) {
       runInAction(() => {
-        const message =
-          e instanceof Error && e.name === "AbortError"
-            ? i18n.t("upload.cancelled")
-            : e instanceof TypeError
-              ? i18n.t("errors.networkError")
-              : e instanceof Error
-                ? e.message
-                : String(e);
-
         const upload = this.uploads.get(uploadId);
-        if (upload) {
-          upload.status = "error";
-          upload.error = message;
+        if (!upload) {
           return;
         }
-
-        this.uploads.set(uploadId, {
-          fileName: file.name,
-          loaded: 0,
-          total: file.size,
-          status: "error",
-          error: message,
-          abortController,
-        });
+        upload.status = "error";
+        if (!isGlobalServerError(e)) {
+          upload.error = resolveFilesystemErrorCode(e, "upload-chunk");
+        }
       });
       throw e;
     }
   }
+
+  reloadListingAfterMutation = (): Promise<void> => {
+    runInAction(() => {
+      if (this.pendingListingReloadCount < 1) {
+        this.pendingListingReloadCount = 1;
+      }
+    });
+    return this.reloadAfterMutation().finally(() => {
+      runInAction(() => {
+        this.pendingListingReloadCount = Math.max(0, this.pendingListingReloadCount - 1);
+      });
+    });
+  };
 
   @action
   cancelUpload(uploadId: string): void {
@@ -295,29 +393,37 @@ class FileBrowserStore {
   }
 
   @action
-  async renameItem(oldName: string, newName: string): Promise<void> {
-    await this.withMutation(async ({ source, path }) => {
-      await apiFilesystemStore.renameResource(
-        source,
-        joinPathChild(path, oldName),
-        joinPathChild(path, newName)
-      );
-      await this.reloadCurrentDirectory();
-    });
+  async renameItem(oldName: string, newName: string, kind: FileBrowserEntryKind): Promise<void> {
+    await this.withMutation(
+      async ({ source, path }) => {
+        await apiFilesystemStore.renameResource(
+          source,
+          joinFileBrowserPathChild(path, oldName),
+          joinFileBrowserPathChild(path, newName),
+          kind
+        );
+      },
+      { expectListingReload: true }
+    );
   }
 
   @action
-  async deleteItem(name: string): Promise<void> {
-    await this.withMutation(async ({ source, path }) => {
-      await apiFilesystemStore.deleteResource(source, joinPathChild(path, name));
-      await this.reloadCurrentDirectory();
-    });
+  async deleteItem(name: string, kind: FileBrowserEntryKind): Promise<void> {
+    await this.withMutation(
+      async ({ source, path }) => {
+        await apiFilesystemStore.deleteResource(source, joinFileBrowserPathChild(path, name), kind);
+      },
+      { expectListingReload: true }
+    );
   }
 
   async downloadItem(name: string, signal?: AbortSignal): Promise<void> {
-    await this.withMutation(async ({ source, path }) => {
-      await apiFilesystemStore.downloadFile(source, joinPathChild(path, name), signal);
-    });
+    const location = this.assertSourceLocation();
+    await apiFilesystemStore.downloadFile(
+      location.source,
+      joinFileBrowserPathChild(location.path, name),
+      signal
+    );
   }
 
   private mapToEntries(data: FileInfo | undefined): FileEntry[] {

@@ -1,5 +1,5 @@
 import { CopyOutlined } from "@ant-design/icons";
-import { joinPathChild } from "@saltbox/saltbox-frontend-common";
+import { joinFileBrowserPathChild } from "@saltbox/saltbox-frontend-common";
 import { Button } from "antd";
 import type { MessageInstance } from "antd/es/message/interface";
 import { memo, type MouseEvent } from "react";
@@ -12,7 +12,7 @@ interface SaltPathCopyButtonProps {
 }
 
 function buildSaltPath(currentPath: string, name: string): string {
-  const fullPath = joinPathChild(currentPath, name);
+  const fullPath = joinFileBrowserPathChild(currentPath, name);
   return `salt://${fullPath.replace(/\/+/g, "/").replace(/^\//, "")}`;
 }
 

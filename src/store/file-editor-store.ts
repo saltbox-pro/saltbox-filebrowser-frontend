@@ -1,5 +1,10 @@
+import { isGlobalServerError } from "@saltbox/saltbox-frontend-common";
 import { action, computed, makeObservable, observable, runInAction } from "mobx";
 
+import {
+  resolveFilesystemErrorCode,
+  type FilesystemErrorCode,
+} from "saltbox-filesystem/helpers/filesystem-error";
 import { getMonacoLanguage } from "saltbox-filesystem/shared/language-utils";
 
 import { apiFilesystemStore } from "./api-filesystem-store";
@@ -12,8 +17,11 @@ class FileEditorStore {
   @observable currentContent: string = "";
   @observable isLoading: boolean = false;
   @observable isSaving: boolean = false;
-  @observable error: string | undefined;
-  @observable saveError: string | undefined;
+  @observable error: FilesystemErrorCode | undefined;
+  @observable saveError: FilesystemErrorCode | undefined;
+
+  private loadId = 0;
+  private saveId = 0;
 
   constructor() {
     makeObservable(this);
@@ -29,54 +37,99 @@ class FileEditorStore {
 
   @action
   async loadFile(source: string, filePath: string): Promise<void> {
+    if (this.isSaving) {
+      return;
+    }
+    const loadId = ++this.loadId;
+    this.saveId += 1;
+
     this.source = source;
     this.filePath = filePath;
     this.fileName = filePath.split("/").pop() || "";
     this.isLoading = true;
+    this.isSaving = false;
     this.error = undefined;
     this.saveError = undefined;
+    this.originalContent = "";
+    this.currentContent = "";
 
     try {
       const content = await apiFilesystemStore.getFileContent(source, filePath);
       runInAction(() => {
+        if (loadId !== this.loadId) {
+          return;
+        }
         this.originalContent = content;
         this.currentContent = content;
         this.isLoading = false;
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       runInAction(() => {
-        this.error = e.message;
+        if (loadId !== this.loadId) {
+          return;
+        }
         this.isLoading = false;
+        this.originalContent = "";
+        this.currentContent = "";
+        this.error = resolveFilesystemErrorCode(e, "fetch-file-content");
       });
     }
   }
 
   @action
   updateContent(content: string): void {
+    if (this.error != null || this.isLoading || this.isSaving) {
+      return;
+    }
     this.currentContent = content;
   }
 
   @action
-  async saveFile(): Promise<void> {
+  async saveFile(): Promise<boolean> {
+    if (this.error != null || this.isLoading || this.isSaving) {
+      return false;
+    }
+
+    const saveId = ++this.saveId;
+    const source = this.source;
+    const filePath = this.filePath;
+    const content = this.currentContent;
+
     this.isSaving = true;
     this.saveError = undefined;
 
     try {
-      await apiFilesystemStore.saveFileContent(this.source, this.filePath, this.currentContent);
+      await apiFilesystemStore.saveFileContent(source, filePath, content);
       runInAction(() => {
-        this.originalContent = this.currentContent;
+        if (saveId !== this.saveId) {
+          return;
+        }
+        this.originalContent = content;
         this.isSaving = false;
       });
-    } catch (e: any) {
+      return saveId === this.saveId;
+    } catch (e: unknown) {
       runInAction(() => {
-        this.saveError = e.message;
+        if (saveId !== this.saveId) {
+          return;
+        }
         this.isSaving = false;
+        if (isGlobalServerError(e)) {
+          return;
+        }
+        this.saveError = resolveFilesystemErrorCode(e, "save-file-error");
       });
+      return false;
     }
   }
 
   @action
   reset(): void {
+    if (this.isSaving) {
+      return;
+    }
+    this.loadId += 1;
+    this.saveId += 1;
     this.source = "";
     this.filePath = "";
     this.fileName = "";

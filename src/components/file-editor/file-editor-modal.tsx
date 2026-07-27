@@ -8,6 +8,7 @@ import type { editor } from "monaco-editor";
 import { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
+import { formatFilesystemError } from "saltbox-filesystem/helpers/translate";
 import { fileEditorStore } from "saltbox-filesystem/store/file-editor-store";
 
 import styles from "./file-editor-modal.module.css";
@@ -34,6 +35,7 @@ interface FileEditorModalProps {
 
 export const FileEditorModal = observer(({ open, onClose }: FileEditorModalProps) => {
   const { t } = useTranslation();
+  const { t: tCommon } = useTranslation("common");
   const [messageApi, contextHolder] = message.useMessage();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
@@ -42,17 +44,17 @@ export const FileEditorModal = observer(({ open, onClose }: FileEditorModalProps
       editorRef.current = editor;
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
         if (fileEditorStore.isDirty && !fileEditorStore.isSaving) {
-          fileEditorStore.saveFile().then(() => {
-            if (!fileEditorStore.saveError) {
+          fileEditorStore.saveFile().then((saved) => {
+            if (saved) {
               messageApi.success(t("editor.saveSuccess"));
-            } else {
-              messageApi.error(t("editor.saveError"));
+            } else if (fileEditorStore.saveError) {
+              messageApi.error(formatFilesystemError(t, tCommon, fileEditorStore.saveError));
             }
           });
         }
       });
     },
-    [t, messageApi]
+    [t, tCommon, messageApi]
   );
 
   const handleChange = useCallback((value: string | undefined) => {
@@ -60,15 +62,18 @@ export const FileEditorModal = observer(({ open, onClose }: FileEditorModalProps
   }, []);
 
   const handleSave = useCallback(async () => {
-    await fileEditorStore.saveFile();
-    if (!fileEditorStore.saveError) {
+    const saved = await fileEditorStore.saveFile();
+    if (saved) {
       messageApi.success(t("editor.saveSuccess"));
-    } else {
-      messageApi.error(t("editor.saveError"));
+    } else if (fileEditorStore.saveError) {
+      messageApi.error(formatFilesystemError(t, tCommon, fileEditorStore.saveError));
     }
-  }, [t, messageApi]);
+  }, [t, tCommon, messageApi]);
 
   const handleClose = useCallback(() => {
+    if (fileEditorStore.isSaving) {
+      return;
+    }
     if (fileEditorStore.isDirty) {
       Modal.confirm({
         title: t("editor.unsavedWarning"),
@@ -83,9 +88,14 @@ export const FileEditorModal = observer(({ open, onClose }: FileEditorModalProps
 
   const handleCopySaltPath = useCallback(() => {
     const saltPath = `salt://${fileEditorStore.filePath.replace(/\/+/g, "/").replace(/^\//, "")}`;
-    navigator.clipboard.writeText(saltPath).then(() => {
-      messageApi.success(t("notifications.saltPathCopied", { path: saltPath }));
-    });
+    navigator.clipboard.writeText(saltPath).then(
+      () => {
+        messageApi.success(t("notifications.saltPathCopied", { path: saltPath }));
+      },
+      () => {
+        messageApi.error(t("notifications.saltPathCopyError"));
+      }
+    );
   }, [t, messageApi]);
 
   const title = (
@@ -107,11 +117,13 @@ export const FileEditorModal = observer(({ open, onClose }: FileEditorModalProps
 
   const footer = (
     <>
-      <Button onClick={handleClose}>{t("actions.cancel")}</Button>
+      <Button onClick={handleClose} disabled={fileEditorStore.isSaving}>
+        {tCommon("file-browser.actions.cancel")}
+      </Button>
       <Button
         type="primary"
         onClick={handleSave}
-        disabled={!fileEditorStore.isDirty}
+        disabled={!fileEditorStore.isDirty || fileEditorStore.isSaving}
         loading={fileEditorStore.isSaving}
       >
         {t("editor.save")}
@@ -131,6 +143,9 @@ export const FileEditorModal = observer(({ open, onClose }: FileEditorModalProps
         centered
         styles={{ body: { height: "85vh", padding: 0, overflow: "hidden" } }}
         destroyOnHidden
+        maskClosable={!fileEditorStore.isSaving}
+        closable={!fileEditorStore.isSaving}
+        keyboard={!fileEditorStore.isSaving}
       >
         {fileEditorStore.isLoading ? (
           <div className={styles.loadingContainer}>
@@ -138,7 +153,7 @@ export const FileEditorModal = observer(({ open, onClose }: FileEditorModalProps
           </div>
         ) : fileEditorStore.error ? (
           <div className={styles.errorContainer}>
-            {t("editor.loadError")}: {fileEditorStore.error}
+            {formatFilesystemError(t, tCommon, fileEditorStore.error)}
           </div>
         ) : (
           <div className={styles.editorContainer}>
@@ -148,7 +163,10 @@ export const FileEditorModal = observer(({ open, onClose }: FileEditorModalProps
               value={fileEditorStore.currentContent}
               onChange={handleChange}
               onMount={handleEditorMount}
-              options={EDITOR_OPTIONS}
+              options={{
+                ...EDITOR_OPTIONS,
+                readOnly: fileEditorStore.isSaving,
+              }}
             />
           </div>
         )}

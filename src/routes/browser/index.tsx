@@ -3,7 +3,7 @@ import {
   FileBrowserSourceAside,
   PageHeader,
   isGlobalServerError,
-  joinPathChild,
+  joinFileBrowserPathChild,
 } from "@saltbox/saltbox-frontend-common";
 import { message, notification, Spin } from "antd";
 import { observer } from "mobx-react";
@@ -13,6 +13,22 @@ import { useTranslation } from "react-i18next";
 import { FileBrowser } from "saltbox-filesystem/components/file-browser/file-browser";
 import { FileEditorModal } from "saltbox-filesystem/components/file-editor/file-editor-modal";
 import { UploadModal } from "saltbox-filesystem/components/upload/upload-modal";
+import {
+  CREATE_ERROR_CODE,
+  REMOVE_ERROR_CODE,
+  RENAME_ERROR_CODE,
+  resolveFilesystemErrorCode,
+  type FileBrowserEntryKind,
+} from "saltbox-filesystem/helpers/filesystem-error";
+import {
+  runNameMutation,
+  runToastMutation,
+  scheduleListingReload,
+} from "saltbox-filesystem/helpers/run-browser-mutation";
+import {
+  formatFilesystemError,
+  formatUnknownFilesystemError,
+} from "saltbox-filesystem/helpers/translate";
 import { fileBrowserStore } from "saltbox-filesystem/store/file-browser-store";
 import { fileEditorStore } from "saltbox-filesystem/store/file-editor-store";
 
@@ -26,6 +42,10 @@ export const FileBrowserPage = observer(() => {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [editorModalOpen, setEditorModalOpen] = useState(false);
 
+  const listingError = fileBrowserStore.error
+    ? formatFilesystemError(t, tCommon, fileBrowserStore.error)
+    : undefined;
+
   useEffect(() => {
     fileBrowserStore.loadSources().then((ok) => {
       if (ok) {
@@ -36,34 +56,27 @@ export const FileBrowserPage = observer(() => {
   }, []);
 
   const handleNavigate = useCallback((path: string) => {
-    if (fileBrowserStore.isBusy) {
+    if (fileBrowserStore.isBusy || fileEditorStore.isSaving) {
       return;
     }
     fileBrowserStore.loadDirectory(undefined, path);
   }, []);
 
   const handleSourceChange = useCallback((source: string) => {
-    if (fileBrowserStore.isBusy) {
+    if (fileBrowserStore.isBusy || fileEditorStore.isSaving) {
       return;
     }
     fileBrowserStore.loadDirectory(source, "/");
   }, []);
 
-  const handleFileOpen = useCallback(
-    (name: string) => {
-      if (fileBrowserStore.isBusy) {
-        return;
-      }
-      try {
-        const fullPath = joinPathChild(fileBrowserStore.currentPath, name);
-        fileEditorStore.loadFile(fileBrowserStore.currentSource, fullPath);
-        setEditorModalOpen(true);
-      } catch (e) {
-        messageApi.error(e instanceof Error ? e.message : t("errors.fetchFileContent"));
-      }
-    },
-    [messageApi, t]
-  );
+  const handleFileOpen = useCallback((name: string) => {
+    if (fileBrowserStore.isBusy || fileEditorStore.isSaving) {
+      return;
+    }
+    const fullPath = joinFileBrowserPathChild(fileBrowserStore.currentPath, name);
+    fileEditorStore.loadFile(fileBrowserStore.currentSource, fullPath);
+    setEditorModalOpen(true);
+  }, []);
 
   const handleEditorClose = useCallback(() => {
     setEditorModalOpen(false);
@@ -75,8 +88,12 @@ export const FileBrowserPage = observer(() => {
       const key = `download-${name}`;
       const controller = new AbortController();
 
-      if (fileBrowserStore.isBusy) {
-        messageApi.error(t("errors.operationBusy"));
+      if (
+        fileBrowserStore.isMutating ||
+        fileBrowserStore.hasActiveUploads ||
+        fileEditorStore.isSaving
+      ) {
+        messageApi.error(formatFilesystemError(t, tCommon, "operation-busy"));
         return;
       }
 
@@ -114,102 +131,112 @@ export const FileBrowserPage = observer(() => {
         }
         notificationApi.error({
           key,
-          message: error instanceof Error ? error.message : t("download.error"),
+          message: formatUnknownFilesystemError(t, tCommon, error, "download-error"),
           description: name,
           placement: "bottomRight",
         });
       }
     },
-    [t, messageApi, notificationApi]
+    [t, tCommon, messageApi, notificationApi]
   );
 
   const handleRename = useCallback(
-    async (oldName: string, newName: string, kind: "file" | "directory") => {
+    async (oldName: string, newName: string, kind: FileBrowserEntryKind) => {
       const kindKey = kind === "directory" ? "directory" : "file";
-      try {
-        await fileBrowserStore.renameItem(oldName, newName);
-        messageApi.success(
-          tCommon(`file-browser.notifications.rename-${kindKey}-success`, {
-            name: `${oldName} → ${newName}`,
-          })
-        );
-      } catch (e) {
-        if (!isGlobalServerError(e)) {
-          messageApi.error(
-            e instanceof Error
-              ? e.message
-              : tCommon(`file-browser.notifications.rename-${kindKey}-error`)
-          );
-        }
-        throw e;
-      }
+      await runNameMutation({
+        run: () => fileBrowserStore.renameItem(oldName, newName, kind),
+        reload: () => fileBrowserStore.reloadListingAfterMutation(),
+        successMessage: tCommon(`file-browser.notifications.rename-${kindKey}-success`, {
+          name: `${oldName} → ${newName}`,
+        }),
+        formatError: (error) => formatUnknownFilesystemError(t, tCommon, error, RENAME_ERROR_CODE),
+        messageApi,
+      });
     },
-    [tCommon, messageApi]
+    [t, tCommon, messageApi]
   );
 
   const handleDelete = useCallback(
-    async (name: string, kind: "file" | "directory") => {
+    async (name: string, kind: FileBrowserEntryKind) => {
       const kindKey = kind === "directory" ? "directory" : "file";
-      try {
-        await fileBrowserStore.deleteItem(name);
-        messageApi.success(
-          tCommon(`file-browser.notifications.delete-${kindKey}-success`, { name })
-        );
-      } catch (e) {
-        if (!isGlobalServerError(e)) {
-          messageApi.error(
-            e instanceof Error
-              ? e.message
-              : tCommon(`file-browser.notifications.delete-${kindKey}-error`)
-          );
-        }
-        throw e;
-      }
+      await runToastMutation({
+        run: () => fileBrowserStore.deleteItem(name, kind),
+        reload: () => fileBrowserStore.reloadListingAfterMutation(),
+        successMessage: tCommon(`file-browser.notifications.delete-${kindKey}-success`, { name }),
+        formatError: (error) => formatUnknownFilesystemError(t, tCommon, error, REMOVE_ERROR_CODE),
+        messageApi,
+      });
     },
-    [tCommon, messageApi]
+    [t, tCommon, messageApi]
   );
 
   const handleCreateFolder = useCallback(
     async (name: string) => {
-      try {
-        await fileBrowserStore.createFolder(name);
-        messageApi.success(
-          tCommon("file-browser.notifications.create-directory-success", { name })
-        );
-      } catch (e) {
-        if (!isGlobalServerError(e)) {
-          messageApi.error(
-            e instanceof Error
-              ? e.message
-              : tCommon("file-browser.notifications.create-directory-error")
-          );
-        }
-        throw e;
-      }
+      await runNameMutation({
+        run: () => fileBrowserStore.createFolder(name),
+        reload: () => fileBrowserStore.reloadListingAfterMutation(),
+        successMessage: tCommon("file-browser.notifications.create-directory-success", { name }),
+        formatError: (error) => formatUnknownFilesystemError(t, tCommon, error, CREATE_ERROR_CODE),
+        messageApi,
+      });
     },
-    [tCommon, messageApi]
+    [t, tCommon, messageApi]
   );
 
   const handleCreateFile = useCallback(
     async (name: string) => {
-      try {
-        await fileBrowserStore.createFile(name);
-        messageApi.success(tCommon("file-browser.notifications.create-file-success", { name }));
-      } catch (e) {
-        if (!isGlobalServerError(e)) {
-          messageApi.error(
-            e instanceof Error ? e.message : tCommon("file-browser.notifications.create-file-error")
-          );
-        }
-        throw e;
-      }
+      await runNameMutation({
+        run: () => fileBrowserStore.createFile(name),
+        reload: () => fileBrowserStore.reloadListingAfterMutation(),
+        successMessage: tCommon("file-browser.notifications.create-file-success", { name }),
+        formatError: (error) => formatUnknownFilesystemError(t, tCommon, error, CREATE_ERROR_CODE),
+        messageApi,
+      });
     },
-    [tCommon, messageApi]
+    [t, tCommon, messageApi]
   );
 
-  const handleUpload = useCallback((file: File) => {
-    return fileBrowserStore.uploadFile(file);
-  }, []);
+  const handleUpload = useCallback(
+    async (file: File) => {
+      try {
+        await fileBrowserStore.uploadFile(file);
+      } catch (error: unknown) {
+        if (isGlobalServerError(error)) {
+          if (fileBrowserStore.hasPendingListingReload) {
+            scheduleListingReload(
+              () => fileBrowserStore.reloadListingAfterMutation(),
+              (reloadError) =>
+                formatUnknownFilesystemError(t, tCommon, reloadError, "listing-reload-error"),
+              messageApi
+            );
+          }
+          return;
+        }
+        const code = resolveFilesystemErrorCode(error, "upload-chunk");
+        if (code === "operation-busy" || code === "no-source" || code === "invalid-name") {
+          messageApi.error(formatFilesystemError(t, tCommon, code));
+        }
+        if (fileBrowserStore.hasPendingListingReload) {
+          scheduleListingReload(
+            () => fileBrowserStore.reloadListingAfterMutation(),
+            (reloadError) =>
+              formatUnknownFilesystemError(t, tCommon, reloadError, "listing-reload-error"),
+            messageApi
+          );
+        }
+        return;
+      }
+
+      scheduleListingReload(
+        () => fileBrowserStore.reloadListingAfterMutation(),
+        (error) => formatUnknownFilesystemError(t, tCommon, error, "listing-reload-error"),
+        messageApi
+      );
+    },
+    [t, tCommon, messageApi]
+  );
+
+  const browserLocked = fileBrowserStore.isBusy || fileEditorStore.isSaving;
 
   return (
     <div className={styles.page}>
@@ -227,7 +254,7 @@ export const FileBrowserPage = observer(() => {
               }))}
               selectedKey={fileBrowserStore.currentSource}
               loading={fileBrowserStore.sourcesLoading}
-              disabled={fileBrowserStore.isBusy}
+              disabled={browserLocked}
               onChange={handleSourceChange}
             />
           }
@@ -236,8 +263,8 @@ export const FileBrowserPage = observer(() => {
             currentPath={fileBrowserStore.currentPath}
             files={fileBrowserStore.files}
             isLoading={fileBrowserStore.isLoading}
-            disabled={fileBrowserStore.isBusy}
-            error={fileBrowserStore.error}
+            disabled={browserLocked}
+            error={listingError}
             messageApi={messageApi}
             onNavigate={handleNavigate}
             onFileOpen={handleFileOpen}
@@ -253,6 +280,7 @@ export const FileBrowserPage = observer(() => {
 
       <UploadModal
         open={uploadModalOpen}
+        disabled={fileEditorStore.isSaving}
         onClose={() => setUploadModalOpen(false)}
         onUpload={handleUpload}
         uploads={fileBrowserStore.uploads}

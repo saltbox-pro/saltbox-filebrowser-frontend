@@ -1,7 +1,7 @@
 import {
   type FileBrowserItem,
-  isSafePathSegment,
-  joinPathChild,
+  isFileBrowserSafePathSegment,
+  joinFileBrowserPathChild,
 } from "@saltbox/saltbox-frontend-common";
 
 import type { FileEntry } from "saltbox-filesystem/store/file-browser-store";
@@ -48,11 +48,11 @@ function parseModifiedAt(modified: string | number | undefined): number | null {
 }
 
 export function toFileBrowserItem(entry: FileEntry, currentPath: string): FileBrowserItem | null {
-  if (!isSafePathSegment(entry.name)) {
+  if (!isFileBrowserSafePathSegment(entry.name)) {
     return null;
   }
 
-  const path = joinPathChild(currentPath, entry.name);
+  const path = joinFileBrowserPathChild(currentPath, entry.name);
 
   return {
     id: path,

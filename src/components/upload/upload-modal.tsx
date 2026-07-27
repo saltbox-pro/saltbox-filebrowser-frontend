@@ -1,14 +1,16 @@
-import { MatIcon, formatFileSize } from "@saltbox/saltbox-frontend-common";
-import { Button, Modal, Progress, Upload } from "antd";
+import { MatIcon, formatFileBrowserSize } from "@saltbox/saltbox-frontend-common";
+import { Button, Modal, Progress, Spin, Upload } from "antd";
 import { observer } from "mobx-react";
 import { useTranslation } from "react-i18next";
 
+import { formatFilesystemError } from "saltbox-filesystem/helpers/translate";
 import { UploadProgress } from "saltbox-filesystem/store/file-browser-store";
 
 const { Dragger } = Upload;
 
 interface UploadModalProps {
   open: boolean;
+  disabled?: boolean;
   onClose: () => void;
   onUpload: (file: File) => Promise<void>;
   uploads: Map<string, UploadProgress>;
@@ -28,8 +30,17 @@ const statusIcon = (status: UploadProgress["status"]) => {
 };
 
 export const UploadModal = observer(
-  ({ open, onClose, onUpload, uploads, onCancelUpload, onClearFinished }: UploadModalProps) => {
+  ({
+    open,
+    disabled = false,
+    onClose,
+    onUpload,
+    uploads,
+    onCancelUpload,
+    onClearFinished,
+  }: UploadModalProps) => {
     const { t } = useTranslation();
+    const { t: tCommon } = useTranslation("common");
 
     const hasActive = Array.from(uploads.values()).some((u) => u.status === "uploading");
 
@@ -50,7 +61,7 @@ export const UploadModal = observer(
           uploads.size > 0 ? (
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <Button onClick={handleClose} disabled={hasActive}>
-                {t("actions.cancel")}
+                {tCommon("file-browser.actions.cancel")}
               </Button>
             </div>
           ) : null
@@ -58,8 +69,12 @@ export const UploadModal = observer(
       >
         <Dragger
           multiple
+          disabled={disabled}
           showUploadList={false}
           beforeUpload={(file) => {
+            if (disabled) {
+              return false;
+            }
             onUpload(file).catch(() => undefined);
             return false;
           }}
@@ -114,8 +129,8 @@ export const UploadModal = observer(
                     </span>
                     <span style={{ fontSize: 12, color: "#888", whiteSpace: "nowrap" }}>
                       {upload.status === "done"
-                        ? formatFileSize(upload.total)
-                        : `${formatFileSize(upload.loaded)} / ${formatFileSize(upload.total)}`}
+                        ? formatFileBrowserSize(upload.total)
+                        : `${formatFileBrowserSize(upload.loaded)} / ${formatFileBrowserSize(upload.total)}`}
                     </span>
                     {upload.status === "uploading" && (
                       <Button
@@ -127,17 +142,33 @@ export const UploadModal = observer(
                       />
                     )}
                   </div>
-                  {upload.status === "uploading" && (
-                    <Progress
-                      percent={percent}
-                      size="small"
-                      showInfo={false}
-                      style={{ marginTop: 4 }}
-                    />
-                  )}
+                  {upload.status === "uploading" &&
+                    (upload.loaded === 0 ? (
+                      <div
+                        style={{
+                          marginTop: 4,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          fontSize: 12,
+                          color: "#888",
+                        }}
+                      >
+                        <Spin size="small" />
+                        {t("upload.preparing")}
+                      </div>
+                    ) : (
+                      <Progress
+                        percent={percent}
+                        size="small"
+                        showInfo={false}
+                        status="active"
+                        style={{ marginTop: 4 }}
+                      />
+                    ))}
                   {upload.status === "error" && upload.error && (
                     <div style={{ fontSize: 12, color: "#ff4d4f", marginTop: 2 }}>
-                      {upload.error}
+                      {formatFilesystemError(t, tCommon, upload.error)}
                     </div>
                   )}
                 </div>

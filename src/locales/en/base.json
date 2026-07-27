@@ -4,13 +4,13 @@
   },
   "actions": {
     "upload": "Upload",
-    "cancel": "Cancel",
     "copySaltPath": "Copy path (salt://)"
   },
   "upload": {
     "title": "Upload Files",
     "dragText": "Click or drag files here to upload",
     "hint": "Supports single or multiple file uploads",
+    "preparing": "Preparing…",
     "cancelled": "Cancelled"
   },
   "download": {
@@ -26,25 +26,18 @@
   "errors": {
     "fetchUser": "Failed to fetch user",
     "fetchResource": "Failed to fetch resource",
-    "createResource": "Failed to create resource",
     "uploadChunk": "Failed to upload chunk",
-    "uploadCancelled": "Upload cancelled",
-    "deleteResource": "Failed to delete resource",
     "fetchFileContent": "Failed to fetch file content",
-    "renameResource": "Failed to rename resource",
-    "downloadFile": "Failed to download file",
-    "conflict": "File already exists",
     "serverError": "Internal server error",
     "serviceUnavailable": "Service temporarily unavailable",
     "networkError": "No connection to server",
-    "operationBusy": "Please wait for the current operation to finish",
-    "noSource": "No file source selected"
+    "noSource": "No file source selected",
+    "invalidName": "Invalid file name"
   },
   "editor": {
     "save": "Save",
     "unsavedChanges": "Unsaved changes",
     "unsavedWarning": "You have unsaved changes. Close without saving?",
-    "loadError": "Failed to load file",
     "saveError": "Failed to save file",
     "saveSuccess": "File saved"
   }

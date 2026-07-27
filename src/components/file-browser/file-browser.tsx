@@ -82,6 +82,7 @@ export function FileBrowser({
       onDelete={(item) => onDelete(item.name, item.kind)}
       onCreateFolder={onCreateFolder}
       onCreateFile={onCreateFile}
+      onSubmitError={(message) => messageApi.error(message)}
       toolbarLeading={
         <Button
           type="primary"
