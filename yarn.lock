@@ -1537,10 +1537,10 @@
   resolved "https://registry.yarnpkg.com/@rtsao/scc/-/scc-1.1.0.tgz#927dd2fae9bc3361403ac2c7a00c32ddce9ad7e8"
   integrity sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==
 
-"@saltbox/saltbox-frontend-common@^0.3.7":
-  version "0.3.7"
-  resolved "https://dev.saltbox.pro/api/v4/projects/70/packages/npm/@saltbox/saltbox-frontend-common/-/@saltbox/saltbox-frontend-common-0.3.7.tgz#a7140d4983066b4e0baaece95fcca56c92d76a85"
-  integrity sha1-pxQNSYMGa04LquzpX8ylbJLXaoU=
+"@saltbox/saltbox-frontend-common@^0.3.8":
+  version "0.3.8"
+  resolved "https://dev.saltbox.pro/api/v4/projects/70/packages/npm/@saltbox/saltbox-frontend-common/-/@saltbox/saltbox-frontend-common-0.3.8.tgz#6d83d109059fecc3ea4bfe3423f4f1ba376c5f2e"
+  integrity sha1-bYPRCQWf7MPqS/40I/TxujdsXy4=
   dependencies:
     "@material-symbols/font-300" "^0.38.0"
     "@monaco-editor/react" "^4.7.0"
