@@ -78,6 +78,14 @@ class FileBrowserStore {
     return this.pendingListingReloadCount > 0;
   }
 
+  @computed get isCurrentSourceReadOnly(): boolean {
+    return this.isSourceReadOnly(this.currentSource);
+  }
+
+  isSourceReadOnly(name: string): boolean {
+    return this.sources.find((source) => source.name === name)?.readOnly === true;
+  }
+
   @action
   async loadSources(): Promise<boolean> {
     this.sourcesLoading = true;
@@ -180,6 +188,9 @@ class FileBrowserStore {
     if (this.isBusy) {
       throw new FilesystemError("operation-busy");
     }
+    if (this.isCurrentSourceReadOnly) {
+      throw new FilesystemError("read-only-source");
+    }
     return this.assertSourceLocation();
   }
 
@@ -192,6 +203,9 @@ class FileBrowserStore {
       this.pendingListingReloadCount > 0
     ) {
       throw new FilesystemError("operation-busy");
+    }
+    if (this.isCurrentSourceReadOnly) {
+      throw new FilesystemError("read-only-source");
     }
     return this.assertSourceLocation();
   }

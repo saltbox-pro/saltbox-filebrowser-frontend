@@ -3,6 +3,27 @@
   width: 100%;
 }
 
+.editorContainer_readOnly :global(.monaco-editor) {
+  cursor: default;
+}
+
+.editorContainer_readOnly :global(.monaco-editor .inputarea) {
+  pointer-events: none;
+}
+
+.editorContainer_readOnly :global(.monaco-editor .cursor) {
+  display: none !important;
+}
+
+.editorContainer_readOnly :global(.monaco-editor .current-line),
+.editorContainer_readOnly :global(.monaco-editor .current-line-margin) {
+  background-color: transparent !important;
+}
+
+.editorContainer_readOnly :global(.monaco-editor-overlaymessage) {
+  display: none !important;
+}
+
 .loadingContainer {
   display: flex;
   align-items: center;

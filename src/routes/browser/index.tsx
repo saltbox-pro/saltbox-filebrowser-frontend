@@ -55,6 +55,14 @@ export const FileBrowserPage = observer(() => {
     });
   }, []);
 
+  const sourceReadOnly = fileBrowserStore.isCurrentSourceReadOnly;
+
+  useEffect(() => {
+    if (sourceReadOnly) {
+      setUploadModalOpen(false);
+    }
+  }, [sourceReadOnly]);
+
   const handleNavigate = useCallback((path: string) => {
     if (fileBrowserStore.isBusy || fileEditorStore.isSaving) {
       return;
@@ -264,6 +272,7 @@ export const FileBrowserPage = observer(() => {
             files={fileBrowserStore.files}
             isLoading={fileBrowserStore.isLoading}
             disabled={browserLocked}
+            readOnly={sourceReadOnly}
             error={listingError}
             messageApi={messageApi}
             onNavigate={handleNavigate}
@@ -280,7 +289,7 @@ export const FileBrowserPage = observer(() => {
 
       <UploadModal
         open={uploadModalOpen}
-        disabled={fileEditorStore.isSaving}
+        disabled={fileEditorStore.isSaving || sourceReadOnly}
         onClose={() => setUploadModalOpen(false)}
         onUpload={handleUpload}
         uploads={fileBrowserStore.uploads}
@@ -288,7 +297,11 @@ export const FileBrowserPage = observer(() => {
         onClearFinished={() => fileBrowserStore.clearFinishedUploads()}
       />
 
-      <FileEditorModal open={editorModalOpen} onClose={handleEditorClose} />
+      <FileEditorModal
+        open={editorModalOpen}
+        readOnly={fileBrowserStore.isSourceReadOnly(fileEditorStore.source)}
+        onClose={handleEditorClose}
+      />
     </div>
   );
 });

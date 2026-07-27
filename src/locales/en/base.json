@@ -32,10 +32,12 @@
     "serviceUnavailable": "Service temporarily unavailable",
     "networkError": "No connection to server",
     "noSource": "No file source selected",
+    "readOnlySource": "This directory is read-only",
     "invalidName": "Invalid file name"
   },
   "editor": {
     "save": "Save",
+    "readOnly": "Read-only",
     "unsavedChanges": "Unsaved changes",
     "unsavedWarning": "You have unsaved changes. Close without saving?",
     "saveError": "Failed to save file",

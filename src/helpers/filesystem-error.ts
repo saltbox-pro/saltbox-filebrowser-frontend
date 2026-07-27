@@ -10,6 +10,7 @@ export const FILESYSTEM_ERROR_CODES = [
   "network-error",
   "no-source",
   "operation-busy",
+  "read-only-source",
   "invalid-name",
   "upload-cancelled",
   "download-error",

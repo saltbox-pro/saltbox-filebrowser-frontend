@@ -12,6 +12,7 @@ const LOCAL_ERROR_KEYS: Partial<Record<FilesystemErrorCode, string>> = {
   "service-unavailable": "errors.serviceUnavailable",
   "network-error": "errors.networkError",
   "no-source": "errors.noSource",
+  "read-only-source": "errors.readOnlySource",
   "invalid-name": "errors.invalidName",
   "upload-cancelled": "upload.cancelled",
   "download-error": "download.error",

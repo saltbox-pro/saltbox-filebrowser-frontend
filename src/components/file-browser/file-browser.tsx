@@ -20,6 +20,7 @@ interface FileBrowserProps {
   files: FileEntry[];
   isLoading: boolean;
   disabled?: boolean;
+  readOnly?: boolean;
   error?: string;
   messageApi: MessageInstance;
   onNavigate: (path: string) => void;
@@ -37,6 +38,7 @@ export function FileBrowser({
   files,
   isLoading,
   disabled = false,
+  readOnly = false,
   error,
   messageApi,
   onNavigate,
@@ -78,26 +80,28 @@ export function FileBrowser({
     <FileBrowserActionsPanel
       disabled={interactionLocked}
       onDownload={(item) => onDownload(item.name)}
-      onRename={(item, newName) => onRename(item.name, newName, item.kind)}
-      onDelete={(item) => onDelete(item.name, item.kind)}
-      onCreateFolder={onCreateFolder}
-      onCreateFile={onCreateFile}
+      onRename={readOnly ? undefined : (item, newName) => onRename(item.name, newName, item.kind)}
+      onDelete={readOnly ? undefined : (item) => onDelete(item.name, item.kind)}
+      onCreateFolder={readOnly ? undefined : onCreateFolder}
+      onCreateFile={readOnly ? undefined : onCreateFile}
       onSubmitError={(message) => messageApi.error(message)}
       toolbarLeading={
-        <Button
-          type="primary"
-          icon={<MatIcon icon="upload_file" size="small" />}
-          aria-disabled={interactionLocked || undefined}
-          tabIndex={interactionLocked ? -1 : undefined}
-          onClick={() => {
-            if (interactionLocked) {
-              return;
-            }
-            onUploadClick();
-          }}
-        >
-          {t("actions.upload")}
-        </Button>
+        readOnly ? undefined : (
+          <Button
+            type="primary"
+            icon={<MatIcon icon="upload_file" size="small" />}
+            aria-disabled={interactionLocked || undefined}
+            tabIndex={interactionLocked ? -1 : undefined}
+            onClick={() => {
+              if (interactionLocked) {
+                return;
+              }
+              onUploadClick();
+            }}
+          >
+            {t("actions.upload")}
+          </Button>
+        )
       }
       renderLeadingActions={(item) => (
         <SaltPathCopyButton currentPath={currentPath} name={item.name} messageApi={messageApi} />
