@@ -36,10 +36,6 @@
     "invalidName": "Invalid file name"
   },
   "editor": {
-    "save": "Save",
-    "readOnly": "Read-only",
-    "unsavedChanges": "Unsaved changes",
-    "unsavedWarning": "You have unsaved changes. Close without saving?",
     "saveError": "Failed to save file",
     "saveSuccess": "File saved"
   }

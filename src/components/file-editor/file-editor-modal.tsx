@@ -1,32 +1,16 @@
-import { CopyOutlined, LockOutlined } from "@ant-design/icons";
-import Editor, { loader, type OnMount } from "@monaco-editor/react";
-import { slsEditorMonacoLoader } from "@saltbox/saltbox-frontend-common";
-import { Button, Modal, Spin, Tag, message } from "antd";
+import { loader, type OnMount } from "@monaco-editor/react";
+import { FileBrowserContentModal, slsEditorMonacoLoader } from "@saltbox/saltbox-frontend-common";
+import { message } from "antd";
 import { observer } from "mobx-react";
 import * as monaco from "monaco-editor";
-import type { editor } from "monaco-editor";
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
 import { formatFilesystemError } from "saltbox-filesystem/helpers/translate";
 import { fileEditorStore } from "saltbox-filesystem/store/file-editor-store";
 
-import styles from "./file-editor-modal.module.css";
-
 loader.config({ monaco });
 slsEditorMonacoLoader.config({ monaco });
-
-type EditorOptions = editor.IStandaloneEditorConstructionOptions;
-
-const EDITOR_OPTIONS: EditorOptions = {
-  minimap: { enabled: false },
-  scrollBeyondLastLine: false,
-  wordWrap: "on",
-  lineNumbers: "on",
-  tabSize: 2,
-  insertSpaces: true,
-  automaticLayout: true,
-};
 
 interface FileEditorModalProps {
   open: boolean;
@@ -39,15 +23,18 @@ export const FileEditorModal = observer(
     const { t } = useTranslation();
     const { t: tCommon } = useTranslation("common");
     const [messageApi, contextHolder] = message.useMessage();
-    const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+
+    const saltPath =
+      fileEditorStore.filePath.length === 0
+        ? ""
+        : `salt://${fileEditorStore.filePath.replace(/\/+/g, "/").replace(/^\//, "")}`;
 
     const handleEditorMount: OnMount = useCallback(
-      (editor, monaco) => {
-        editorRef.current = editor;
+      (editor, monacoApi) => {
         if (readOnly) {
           return;
         }
-        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+        editor.addCommand(monacoApi.KeyMod.CtrlCmd | monacoApi.KeyCode.KeyS, () => {
           if (fileEditorStore.isDirty && !fileEditorStore.isSaving) {
             fileEditorStore.saveFile().then((saved) => {
               if (saved) {
@@ -62,8 +49,8 @@ export const FileEditorModal = observer(
       [readOnly, t, tCommon, messageApi]
     );
 
-    const handleChange = useCallback((value: string | undefined) => {
-      fileEditorStore.updateContent(value ?? "");
+    const handleChange = useCallback((value: string) => {
+      fileEditorStore.updateContent(value);
     }, []);
 
     const handleSave = useCallback(async () => {
@@ -75,112 +62,33 @@ export const FileEditorModal = observer(
       }
     }, [t, tCommon, messageApi]);
 
-    const handleClose = useCallback(() => {
-      if (fileEditorStore.isSaving) {
-        return;
-      }
-      if (fileEditorStore.isDirty) {
-        Modal.confirm({
-          title: t("editor.unsavedWarning"),
-          onOk: () => {
-            onClose();
-          },
-        });
-      } else {
-        onClose();
-      }
-    }, [onClose, t]);
-
-    const handleCopySaltPath = useCallback(() => {
-      const saltPath = `salt://${fileEditorStore.filePath.replace(/\/+/g, "/").replace(/^\//, "")}`;
-      navigator.clipboard.writeText(saltPath).then(
-        () => {
-          messageApi.success(t("notifications.saltPathCopied", { path: saltPath }));
-        },
-        () => {
-          messageApi.error(t("notifications.saltPathCopyError"));
-        }
-      );
-    }, [t, messageApi]);
-
-    const title = (
-      <div className={styles.headerInfo}>
-        <span>{fileEditorStore.fileName}</span>
-        <Tag>{fileEditorStore.language}</Tag>
-        {readOnly && <Tag icon={<LockOutlined />}>{t("editor.readOnly")}</Tag>}
-        <Button
-          type="text"
-          size="small"
-          icon={<CopyOutlined />}
-          onClick={handleCopySaltPath}
-          title={t("actions.copySaltPath")}
-        />
-        {fileEditorStore.isDirty && (
-          <span className={styles.dirtyIndicator} title={t("editor.unsavedChanges")} />
-        )}
-      </div>
-    );
-
-    const footer = (
-      <>
-        <Button onClick={handleClose} disabled={fileEditorStore.isSaving}>
-          {tCommon("file-browser.actions.cancel")}
-        </Button>
-        {!readOnly && (
-          <Button
-            type="primary"
-            onClick={handleSave}
-            disabled={!fileEditorStore.isDirty || fileEditorStore.isSaving}
-            loading={fileEditorStore.isSaving}
-          >
-            {t("editor.save")}
-          </Button>
-        )}
-      </>
-    );
-
     return (
       <>
         {contextHolder}
-        <Modal
+        <FileBrowserContentModal
           open={open}
-          title={title}
-          footer={footer}
-          onCancel={handleClose}
-          width="95vw"
-          centered
-          styles={{ body: { height: "85vh", padding: 0, overflow: "hidden" } }}
-          destroyOnHidden
-          maskClosable={!fileEditorStore.isSaving}
-          closable={!fileEditorStore.isSaving}
-          keyboard={!fileEditorStore.isSaving}
-        >
-          {fileEditorStore.isLoading ? (
-            <div className={styles.loadingContainer}>
-              <Spin size="large" />
-            </div>
-          ) : fileEditorStore.error ? (
-            <div className={styles.errorContainer}>
-              {formatFilesystemError(t, tCommon, fileEditorStore.error)}
-            </div>
-          ) : (
-            <div
-              className={`${styles.editorContainer}${readOnly ? ` ${styles.editorContainer_readOnly}` : ""}`}
-            >
-              <Editor
-                height="100%"
-                language={fileEditorStore.language}
-                value={fileEditorStore.currentContent}
-                onChange={handleChange}
-                onMount={handleEditorMount}
-                options={{
-                  ...EDITOR_OPTIONS,
-                  readOnly: readOnly || fileEditorStore.isSaving,
-                }}
-              />
-            </div>
-          )}
-        </Modal>
+          fileName={fileEditorStore.fileName}
+          filePath={fileEditorStore.filePath}
+          pathCopyText={saltPath}
+          pathCopyTitle={t("actions.copySaltPath")}
+          pathCopySuccessMessage={t("notifications.saltPathCopied", { path: saltPath })}
+          pathCopyErrorMessage={t("notifications.saltPathCopyError")}
+          language={fileEditorStore.language}
+          content={fileEditorStore.currentContent}
+          loading={fileEditorStore.isLoading}
+          error={
+            fileEditorStore.error
+              ? formatFilesystemError(t, tCommon, fileEditorStore.error)
+              : undefined
+          }
+          readOnly={readOnly}
+          isDirty={fileEditorStore.isDirty}
+          isSaving={fileEditorStore.isSaving}
+          onChange={handleChange}
+          onSave={handleSave}
+          onClose={onClose}
+          onEditorMount={handleEditorMount}
+        />
       </>
     );
   }

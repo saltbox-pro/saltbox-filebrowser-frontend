@@ -1,6 +1,7 @@
 import {
   FileBrowserActionsPanel,
   FileBrowserView,
+  isTextFile,
   type FileBrowserItem,
   MatIcon,
 } from "@saltbox/saltbox-frontend-common";
@@ -9,7 +10,6 @@ import type { MessageInstance } from "antd/es/message/interface";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { isTextFile } from "saltbox-filesystem/shared/language-utils";
 import type { FileEntry } from "saltbox-filesystem/store/file-browser-store";
 
 import { toFileBrowserItem } from "./map-to-file-browser-item";
@@ -119,6 +119,9 @@ export function FileBrowser({
           toolbar={toolbar}
           onNavigate={onNavigate}
           onItemClick={handleItemClick}
+          isItemClickable={(item) =>
+            item.kind === "directory" || isTextFile(item.name, item.iconHint)
+          }
           renderRowActions={renderRowActions}
         />
       )}

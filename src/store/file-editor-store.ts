@@ -1,11 +1,10 @@
-import { isGlobalServerError } from "@saltbox/saltbox-frontend-common";
+import { getMonacoLanguage, isGlobalServerError } from "@saltbox/saltbox-frontend-common";
 import { action, computed, makeObservable, observable, runInAction } from "mobx";
 
 import {
   resolveFilesystemErrorCode,
   type FilesystemErrorCode,
 } from "saltbox-filesystem/helpers/filesystem-error";
-import { getMonacoLanguage } from "saltbox-filesystem/shared/language-utils";
 
 import { apiFilesystemStore } from "./api-filesystem-store";
 
