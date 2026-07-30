@@ -1,9 +1,9 @@
-import { loader, type OnMount } from "@monaco-editor/react";
+import { loader } from "@monaco-editor/react";
 import { FileBrowserContentModal, slsEditorMonacoLoader } from "@saltbox/saltbox-frontend-common";
 import { message } from "antd";
 import { observer } from "mobx-react";
 import * as monaco from "monaco-editor";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { formatFilesystemError } from "saltbox-filesystem/helpers/translate";
@@ -24,30 +24,17 @@ export const FileEditorModal = observer(
     const { t: tCommon } = useTranslation("common");
     const [messageApi, contextHolder] = message.useMessage();
 
-    const saltPath =
-      fileEditorStore.filePath.length === 0
-        ? ""
-        : `salt://${fileEditorStore.filePath.replace(/\/+/g, "/").replace(/^\//, "")}`;
+    const filePath = fileEditorStore.filePath;
+    const isEditing = fileEditorStore.mode === "edit";
 
-    const handleEditorMount: OnMount = useCallback(
-      (editor, monacoApi) => {
-        if (readOnly) {
-          return;
-        }
-        editor.addCommand(monacoApi.KeyMod.CtrlCmd | monacoApi.KeyCode.KeyS, () => {
-          if (fileEditorStore.isDirty && !fileEditorStore.isSaving) {
-            fileEditorStore.saveFile().then((saved) => {
-              if (saved) {
-                messageApi.success(t("editor.saveSuccess"));
-              } else if (fileEditorStore.saveError) {
-                messageApi.error(formatFilesystemError(t, tCommon, fileEditorStore.saveError));
-              }
-            });
-          }
-        });
-      },
-      [readOnly, t, tCommon, messageApi]
-    );
+    const saltPath =
+      filePath.length === 0 ? "" : `salt://${filePath.replace(/\/+/g, "/").replace(/^\//, "")}`;
+
+    useEffect(() => {
+      if (!open || readOnly) {
+        fileEditorStore.cancelEdit();
+      }
+    }, [open, readOnly]);
 
     const handleChange = useCallback((value: string) => {
       fileEditorStore.updateContent(value);
@@ -56,11 +43,21 @@ export const FileEditorModal = observer(
     const handleSave = useCallback(async () => {
       const saved = await fileEditorStore.saveFile();
       if (saved) {
-        messageApi.success(t("editor.saveSuccess"));
+        messageApi.success(
+          tCommon("file-browser.notifications.file-save-success", {
+            name: fileEditorStore.fileName,
+          })
+        );
       } else if (fileEditorStore.saveError) {
         messageApi.error(formatFilesystemError(t, tCommon, fileEditorStore.saveError));
       }
     }, [t, tCommon, messageApi]);
+
+    const canEdit =
+      !readOnly &&
+      !fileEditorStore.isLoading &&
+      !fileEditorStore.isSaving &&
+      fileEditorStore.error == null;
 
     return (
       <>
@@ -68,26 +65,31 @@ export const FileEditorModal = observer(
         <FileBrowserContentModal
           open={open}
           fileName={fileEditorStore.fileName}
-          filePath={fileEditorStore.filePath}
+          filePath={filePath}
           pathCopyText={saltPath}
           pathCopyTitle={t("actions.copySaltPath")}
           pathCopySuccessMessage={t("notifications.saltPathCopied", { path: saltPath })}
           pathCopyErrorMessage={t("notifications.saltPathCopyError")}
           language={fileEditorStore.language}
-          content={fileEditorStore.currentContent}
+          content={isEditing ? fileEditorStore.currentContent : fileEditorStore.originalContent}
           loading={fileEditorStore.isLoading}
+          empty={
+            !isEditing && fileEditorStore.originalContent.length === 0 && !fileEditorStore.isLoading
+          }
           error={
             fileEditorStore.error
               ? formatFilesystemError(t, tCommon, fileEditorStore.error)
               : undefined
           }
-          readOnly={readOnly}
+          readOnly={!isEditing}
+          canEdit={canEdit}
           isDirty={fileEditorStore.isDirty}
           isSaving={fileEditorStore.isSaving}
+          onEdit={readOnly ? undefined : () => fileEditorStore.enterEdit()}
+          onCancelEdit={() => fileEditorStore.cancelEdit()}
           onChange={handleChange}
           onSave={handleSave}
           onClose={onClose}
-          onEditorMount={handleEditorMount}
         />
       </>
     );

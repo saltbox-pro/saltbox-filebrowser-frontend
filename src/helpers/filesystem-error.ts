@@ -16,7 +16,7 @@ export const FILESYSTEM_ERROR_CODES = [
   "download-error",
   "name-already-exists",
   "create-error",
-  "save-file-error",
+  "file-write-error",
   "remove-error",
   "rename-error",
   "listing-reload-error",

@@ -16,7 +16,6 @@ const LOCAL_ERROR_KEYS: Partial<Record<FilesystemErrorCode, string>> = {
   "invalid-name": "errors.invalidName",
   "upload-cancelled": "upload.cancelled",
   "download-error": "download.error",
-  "save-file-error": "editor.saveError",
 };
 
 export function formatFilesystemError(

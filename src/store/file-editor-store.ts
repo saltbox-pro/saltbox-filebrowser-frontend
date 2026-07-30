@@ -8,10 +8,13 @@ import {
 
 import { apiFilesystemStore } from "./api-filesystem-store";
 
+export type FileEditorMode = "view" | "edit";
+
 class FileEditorStore {
   @observable source: string = "";
   @observable filePath: string = "";
   @observable fileName: string = "";
+  @observable mode: FileEditorMode = "view";
   @observable originalContent: string = "";
   @observable currentContent: string = "";
   @observable isLoading: boolean = false;
@@ -45,6 +48,7 @@ class FileEditorStore {
     this.source = source;
     this.filePath = filePath;
     this.fileName = filePath.split("/").pop() || "";
+    this.mode = "view";
     this.isLoading = true;
     this.isSaving = false;
     this.error = undefined;
@@ -76,8 +80,28 @@ class FileEditorStore {
   }
 
   @action
+  enterEdit = (): void => {
+    if (this.mode === "edit" || this.isLoading || this.isSaving || this.error != null) {
+      return;
+    }
+    this.mode = "edit";
+    this.currentContent = this.originalContent;
+    this.saveError = undefined;
+  };
+
+  @action
+  cancelEdit = (): void => {
+    if (this.isSaving) {
+      return;
+    }
+    this.mode = "view";
+    this.currentContent = this.originalContent;
+    this.saveError = undefined;
+  };
+
+  @action
   updateContent(content: string): void {
-    if (this.error != null || this.isLoading || this.isSaving) {
+    if (this.mode !== "edit" || this.error != null || this.isLoading || this.isSaving) {
       return;
     }
     this.currentContent = content;
@@ -85,7 +109,7 @@ class FileEditorStore {
 
   @action
   async saveFile(): Promise<boolean> {
-    if (this.error != null || this.isLoading || this.isSaving) {
+    if (this.mode !== "edit" || this.error != null || this.isLoading || this.isSaving) {
       return false;
     }
 
@@ -104,6 +128,8 @@ class FileEditorStore {
           return;
         }
         this.originalContent = content;
+        this.currentContent = content;
+        this.mode = "view";
         this.isSaving = false;
       });
       return saveId === this.saveId;
@@ -116,7 +142,7 @@ class FileEditorStore {
         if (isGlobalServerError(e)) {
           return;
         }
-        this.saveError = resolveFilesystemErrorCode(e, "save-file-error");
+        this.saveError = resolveFilesystemErrorCode(e, "file-write-error");
       });
       return false;
     }
@@ -124,14 +150,12 @@ class FileEditorStore {
 
   @action
   reset(): void {
-    if (this.isSaving) {
-      return;
-    }
     this.loadId += 1;
     this.saveId += 1;
     this.source = "";
     this.filePath = "";
     this.fileName = "";
+    this.mode = "view";
     this.originalContent = "";
     this.currentContent = "";
     this.isLoading = false;

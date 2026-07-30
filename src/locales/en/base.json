@@ -34,9 +34,5 @@
     "noSource": "No file source selected",
     "readOnlySource": "This directory is read-only",
     "invalidName": "Invalid file name"
-  },
-  "editor": {
-    "saveError": "Failed to save file",
-    "saveSuccess": "File saved"
   }
 }

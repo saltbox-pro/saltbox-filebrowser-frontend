@@ -247,7 +247,7 @@ class ApiFilesystemStore {
 
   async saveFileContent(source: string, filePath: string, content: string): Promise<void> {
     if (!this.basePath) {
-      throw new FilesystemError("save-file-error");
+      throw new FilesystemError("file-write-error");
     }
     const fileName = filePath.split("/").pop() || "file";
     const blob = new Blob([content], { type: "text/plain" });
@@ -255,7 +255,7 @@ class ApiFilesystemStore {
     await this.createResource(source, filePath, {
       file,
       override: true,
-      errorCode: "save-file-error",
+      errorCode: "file-write-error",
     });
   }
 
