@@ -31,6 +31,7 @@ interface FileBrowserProps {
   onCreateFolder: (name: string) => void;
   onCreateFile: (name: string) => void;
   onUploadClick: () => void;
+  onReload: () => void | Promise<void>;
 }
 
 export function FileBrowser({
@@ -49,6 +50,7 @@ export function FileBrowser({
   onCreateFolder,
   onCreateFile,
   onUploadClick,
+  onReload,
 }: FileBrowserProps) {
   const { t } = useTranslation();
 
@@ -84,6 +86,7 @@ export function FileBrowser({
       onDelete={readOnly ? undefined : (item) => onDelete(item.name, item.kind)}
       onCreateFolder={readOnly ? undefined : onCreateFolder}
       onCreateFile={readOnly ? undefined : onCreateFile}
+      onReload={onReload}
       onSubmitError={(message) => messageApi.error(message)}
       toolbarLeading={
         readOnly ? undefined : (

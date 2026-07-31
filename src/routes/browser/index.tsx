@@ -70,6 +70,13 @@ export const FileBrowserPage = observer(() => {
     fileBrowserStore.loadDirectory(undefined, path);
   }, []);
 
+  const handleReload = useCallback((): Promise<void> => {
+    if (fileBrowserStore.isBusy || fileEditorStore.isSaving) {
+      return Promise.resolve();
+    }
+    return fileBrowserStore.loadDirectory();
+  }, []);
+
   const handleSourceChange = useCallback((source: string) => {
     if (fileBrowserStore.isBusy || fileEditorStore.isSaving) {
       return;
@@ -283,6 +290,7 @@ export const FileBrowserPage = observer(() => {
             onCreateFolder={handleCreateFolder}
             onCreateFile={handleCreateFile}
             onUploadClick={() => setUploadModalOpen(true)}
+            onReload={handleReload}
           />
         </FileBrowserLayout>
       </div>
