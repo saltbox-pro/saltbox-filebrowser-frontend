@@ -2,31 +2,9 @@
   "browser": {
     "title": "File Manager"
   },
-  "actions": {
-    "upload": "Upload",
-    "copySaltPath": "Copy path (salt://)"
-  },
-  "upload": {
-    "title": "Upload Files",
-    "dragText": "Click or drag files here to upload",
-    "hint": "Supports single or multiple file uploads",
-    "preparing": "Preparing…",
-    "cancelled": "Cancelled"
-  },
-  "download": {
-    "started": "Preparing file for download",
-    "success": "File is ready for download",
-    "error": "Download failed",
-    "cancelled": "Download cancelled"
-  },
-  "notifications": {
-    "saltPathCopied": "Path copied: \"{{path}}\"",
-    "saltPathCopyError": "Failed to copy path"
-  },
   "errors": {
     "fetchUser": "Failed to fetch user",
     "fetchResource": "Failed to fetch resource",
-    "uploadChunk": "Failed to upload chunk",
     "fetchFileContent": "Failed to fetch file content",
     "serverError": "Internal server error",
     "serviceUnavailable": "Service temporarily unavailable",

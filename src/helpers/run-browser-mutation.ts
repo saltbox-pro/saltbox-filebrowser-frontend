@@ -1,24 +1,43 @@
-import { FileBrowserSubmitError, isGlobalServerError } from "@saltbox/saltbox-frontend-common";
+import {
+  FileBrowserSubmitError,
+  isGlobalServerError,
+  type FileBrowserNotificationSuccessKey,
+  type ShowFileBrowserSuccessByKey,
+} from "@saltbox/saltbox-frontend-common";
 
-interface MutationNotifier {
-  success: (content: string) => void;
-  error: (content: string) => void;
+import { resolveFilesystemErrorCode, type FilesystemErrorCode } from "./filesystem-error";
+
+export interface MutationNotify {
+  showLocalError: (text: string) => void;
+  showSuccessByKey: ShowFileBrowserSuccessByKey;
+  resolveErrorText: (code: string) => string;
 }
 
 interface RunMutationOptions {
   run: () => Promise<void>;
   reload?: () => Promise<void>;
-  successMessage: string;
-  formatError: (error: unknown) => string;
-  messageApi: MutationNotifier;
+  successKey: FileBrowserNotificationSuccessKey;
+  successParams?: Record<string, unknown>;
+  notify: MutationNotify;
+  fallbackErrorCode: FilesystemErrorCode;
+}
+
+function notifyError(
+  notify: MutationNotify,
+  error: unknown,
+  fallbackErrorCode: FilesystemErrorCode
+): void {
+  const code = resolveFilesystemErrorCode(error, fallbackErrorCode);
+  notify.showLocalError(notify.resolveErrorText(code));
 }
 
 export async function runNameMutation({
   run,
   reload,
-  successMessage,
-  formatError,
-  messageApi,
+  successKey,
+  successParams,
+  notify,
+  fallbackErrorCode,
 }: RunMutationOptions): Promise<void> {
   try {
     await run();
@@ -26,19 +45,25 @@ export async function runNameMutation({
     if (isGlobalServerError(error)) {
       throw error;
     }
-    throw new FileBrowserSubmitError(formatError(error));
+    const code = resolveFilesystemErrorCode(error, fallbackErrorCode);
+    throw new FileBrowserSubmitError(notify.resolveErrorText(code));
   }
 
-  messageApi.success(successMessage);
-  scheduleListingReload(reload, formatError, messageApi);
+  notify.showSuccessByKey({
+    key: successKey,
+    params: successParams,
+    dismissStickyError: true,
+  });
+  scheduleListingReload(reload, notify);
 }
 
 export async function runToastMutation({
   run,
   reload,
-  successMessage,
-  formatError,
-  messageApi,
+  successKey,
+  successParams,
+  notify,
+  fallbackErrorCode,
 }: RunMutationOptions): Promise<void> {
   try {
     await run();
@@ -46,18 +71,22 @@ export async function runToastMutation({
     if (isGlobalServerError(error)) {
       throw error;
     }
-    messageApi.error(formatError(error));
+    notifyError(notify, error, fallbackErrorCode);
     throw error;
   }
 
-  messageApi.success(successMessage);
-  scheduleListingReload(reload, formatError, messageApi);
+  notify.showSuccessByKey({
+    key: successKey,
+    params: successParams,
+    dismissStickyError: true,
+  });
+  scheduleListingReload(reload, notify);
 }
 
 export function scheduleListingReload(
   reload: (() => Promise<void>) | undefined,
-  formatError: (error: unknown) => string,
-  messageApi: Pick<MutationNotifier, "error">
+  notify: MutationNotify,
+  fallbackErrorCode: FilesystemErrorCode = "listing-reload-error"
 ) {
   if (reload == null) {
     return;
@@ -67,6 +96,6 @@ export function scheduleListingReload(
     if (isGlobalServerError(error)) {
       return;
     }
-    messageApi.error(formatError(error));
+    notifyError(notify, error, fallbackErrorCode);
   });
 }

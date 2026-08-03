@@ -1,18 +1,21 @@
 import {
   FileBrowserLayout,
   FileBrowserSourceAside,
+  FileBrowserUploadModal,
   PageHeader,
+  dismissFileBrowserToast,
   isGlobalServerError,
   joinFileBrowserPathChild,
+  runWithFileBrowserDownloadNotification,
+  useFileBrowserNotificationToasts,
 } from "@saltbox/saltbox-frontend-common";
-import { message, notification, Spin } from "antd";
+import { message, notification } from "antd";
 import { observer } from "mobx-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { FileBrowser } from "saltbox-filesystem/components/file-browser/file-browser";
 import { FileEditorModal } from "saltbox-filesystem/components/file-editor/file-editor-modal";
-import { UploadModal } from "saltbox-filesystem/components/upload/upload-modal";
 import {
   CREATE_ERROR_CODE,
   REMOVE_ERROR_CODE,
@@ -24,10 +27,11 @@ import {
   runNameMutation,
   runToastMutation,
   scheduleListingReload,
+  type MutationNotify,
 } from "saltbox-filesystem/helpers/run-browser-mutation";
 import {
-  formatFilesystemError,
-  formatUnknownFilesystemError,
+  formatLocalFilesystemError,
+  resolveFilesystemErrorText,
 } from "saltbox-filesystem/helpers/translate";
 import { fileBrowserStore } from "saltbox-filesystem/store/file-browser-store";
 import { fileEditorStore } from "saltbox-filesystem/store/file-editor-store";
@@ -36,14 +40,29 @@ import styles from "./browser-page.module.css";
 
 export const FileBrowserPage = observer(() => {
   const { t } = useTranslation();
-  const { t: tCommon } = useTranslation("common");
   const [messageApi, messageContextHolder] = message.useMessage();
   const [notificationApi, notificationContextHolder] = notification.useNotification();
+  const toasts = useFileBrowserNotificationToasts(messageApi);
+  const { showLocalError, showSuccessByKey, translateError, downloadLabels } = toasts;
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [editorModalOpen, setEditorModalOpen] = useState(false);
 
+  const resolveErrorText = useCallback(
+    (code: string) => resolveFilesystemErrorText(translateError, t, code),
+    [t, translateError]
+  );
+
+  const notify = useMemo<MutationNotify>(
+    () => ({
+      showLocalError,
+      showSuccessByKey,
+      resolveErrorText,
+    }),
+    [showLocalError, showSuccessByKey, resolveErrorText]
+  );
+
   const listingError = fileBrowserStore.error
-    ? formatFilesystemError(t, tCommon, fileBrowserStore.error)
+    ? resolveErrorText(fileBrowserStore.error)
     : undefined;
 
   useEffect(() => {
@@ -67,6 +86,8 @@ export const FileBrowserPage = observer(() => {
     if (fileBrowserStore.isBusy || fileEditorStore.isSaving) {
       return;
     }
+    setEditorModalOpen(false);
+    fileEditorStore.reset();
     fileBrowserStore.loadDirectory(undefined, path);
   }, []);
 
@@ -74,13 +95,16 @@ export const FileBrowserPage = observer(() => {
     if (fileBrowserStore.isBusy || fileEditorStore.isSaving) {
       return Promise.resolve();
     }
+    dismissFileBrowserToast(messageApi);
     return fileBrowserStore.loadDirectory();
-  }, []);
+  }, [messageApi]);
 
   const handleSourceChange = useCallback((source: string) => {
     if (fileBrowserStore.isBusy || fileEditorStore.isSaving) {
       return;
     }
+    setEditorModalOpen(false);
+    fileEditorStore.reset();
     fileBrowserStore.loadDirectory(source, "/");
   }, []);
 
@@ -100,59 +124,26 @@ export const FileBrowserPage = observer(() => {
 
   const handleDownload = useCallback(
     async (name: string) => {
-      const key = `download-${name}`;
-      const controller = new AbortController();
-
       if (
         fileBrowserStore.isMutating ||
         fileBrowserStore.hasActiveUploads ||
         fileEditorStore.isSaving
       ) {
-        messageApi.error(formatFilesystemError(t, tCommon, "operation-busy"));
+        showLocalError(resolveErrorText("operation-busy"));
         return;
       }
 
-      notificationApi.info({
-        key,
-        message: t("download.started"),
-        description: name,
-        placement: "bottomRight",
-        duration: 0,
-        icon: <Spin size="small" />,
-        onClose: () => controller.abort(),
+      await runWithFileBrowserDownloadNotification({
+        notificationApi,
+        itemName: name,
+        itemPath: joinFileBrowserPathChild(fileBrowserStore.currentPath, name),
+        labels: downloadLabels,
+        formatError: (error) =>
+          resolveErrorText(resolveFilesystemErrorCode(error, "download-error")),
+        download: (signal) => fileBrowserStore.downloadItem(name, signal),
       });
-
-      try {
-        await fileBrowserStore.downloadItem(name, controller.signal);
-        notificationApi.success({
-          key,
-          message: t("download.success"),
-          description: name,
-          placement: "bottomRight",
-        });
-      } catch (error) {
-        if (error instanceof Error && error.name === "AbortError") {
-          notificationApi.info({
-            key,
-            message: t("download.cancelled"),
-            description: name,
-            placement: "bottomRight",
-          });
-          return;
-        }
-        if (isGlobalServerError(error)) {
-          notificationApi.destroy(key);
-          return;
-        }
-        notificationApi.error({
-          key,
-          message: formatUnknownFilesystemError(t, tCommon, error, "download-error"),
-          description: name,
-          placement: "bottomRight",
-        });
-      }
     },
-    [t, tCommon, messageApi, notificationApi]
+    [notificationApi, showLocalError, resolveErrorText, downloadLabels]
   );
 
   const handleRename = useCallback(
@@ -161,14 +152,13 @@ export const FileBrowserPage = observer(() => {
       await runNameMutation({
         run: () => fileBrowserStore.renameItem(oldName, newName, kind),
         reload: () => fileBrowserStore.reloadListingAfterMutation(),
-        successMessage: tCommon(`file-browser.notifications.rename-${kindKey}-success`, {
-          name: `${oldName} → ${newName}`,
-        }),
-        formatError: (error) => formatUnknownFilesystemError(t, tCommon, error, RENAME_ERROR_CODE),
-        messageApi,
+        successKey: kindKey === "directory" ? "rename-directory-success" : "rename-file-success",
+        successParams: { name: `${oldName} → ${newName}` },
+        notify,
+        fallbackErrorCode: RENAME_ERROR_CODE,
       });
     },
-    [t, tCommon, messageApi]
+    [notify]
   );
 
   const handleDelete = useCallback(
@@ -177,12 +167,13 @@ export const FileBrowserPage = observer(() => {
       await runToastMutation({
         run: () => fileBrowserStore.deleteItem(name, kind),
         reload: () => fileBrowserStore.reloadListingAfterMutation(),
-        successMessage: tCommon(`file-browser.notifications.delete-${kindKey}-success`, { name }),
-        formatError: (error) => formatUnknownFilesystemError(t, tCommon, error, REMOVE_ERROR_CODE),
-        messageApi,
+        successKey: kindKey === "directory" ? "delete-directory-success" : "delete-file-success",
+        successParams: { name },
+        notify,
+        fallbackErrorCode: REMOVE_ERROR_CODE,
       });
     },
-    [t, tCommon, messageApi]
+    [notify]
   );
 
   const handleCreateFolder = useCallback(
@@ -190,12 +181,13 @@ export const FileBrowserPage = observer(() => {
       await runNameMutation({
         run: () => fileBrowserStore.createFolder(name),
         reload: () => fileBrowserStore.reloadListingAfterMutation(),
-        successMessage: tCommon("file-browser.notifications.create-directory-success", { name }),
-        formatError: (error) => formatUnknownFilesystemError(t, tCommon, error, CREATE_ERROR_CODE),
-        messageApi,
+        successKey: "create-directory-success",
+        successParams: { name },
+        notify,
+        fallbackErrorCode: CREATE_ERROR_CODE,
       });
     },
-    [t, tCommon, messageApi]
+    [notify]
   );
 
   const handleCreateFile = useCallback(
@@ -203,12 +195,13 @@ export const FileBrowserPage = observer(() => {
       await runNameMutation({
         run: () => fileBrowserStore.createFile(name),
         reload: () => fileBrowserStore.reloadListingAfterMutation(),
-        successMessage: tCommon("file-browser.notifications.create-file-success", { name }),
-        formatError: (error) => formatUnknownFilesystemError(t, tCommon, error, CREATE_ERROR_CODE),
-        messageApi,
+        successKey: "create-file-success",
+        successParams: { name },
+        notify,
+        fallbackErrorCode: CREATE_ERROR_CODE,
       });
     },
-    [t, tCommon, messageApi]
+    [notify]
   );
 
   const handleUpload = useCallback(
@@ -218,37 +211,24 @@ export const FileBrowserPage = observer(() => {
       } catch (error: unknown) {
         if (isGlobalServerError(error)) {
           if (fileBrowserStore.hasPendingListingReload) {
-            scheduleListingReload(
-              () => fileBrowserStore.reloadListingAfterMutation(),
-              (reloadError) =>
-                formatUnknownFilesystemError(t, tCommon, reloadError, "listing-reload-error"),
-              messageApi
-            );
+            scheduleListingReload(() => fileBrowserStore.reloadListingAfterMutation(), notify);
           }
           return;
         }
         const code = resolveFilesystemErrorCode(error, "upload-chunk");
         if (code === "operation-busy" || code === "no-source" || code === "invalid-name") {
-          messageApi.error(formatFilesystemError(t, tCommon, code));
+          showLocalError(resolveErrorText(code));
         }
         if (fileBrowserStore.hasPendingListingReload) {
-          scheduleListingReload(
-            () => fileBrowserStore.reloadListingAfterMutation(),
-            (reloadError) =>
-              formatUnknownFilesystemError(t, tCommon, reloadError, "listing-reload-error"),
-            messageApi
-          );
+          scheduleListingReload(() => fileBrowserStore.reloadListingAfterMutation(), notify);
         }
         return;
       }
 
-      scheduleListingReload(
-        () => fileBrowserStore.reloadListingAfterMutation(),
-        (error) => formatUnknownFilesystemError(t, tCommon, error, "listing-reload-error"),
-        messageApi
-      );
+      dismissFileBrowserToast(messageApi);
+      scheduleListingReload(() => fileBrowserStore.reloadListingAfterMutation(), notify);
     },
-    [t, tCommon, messageApi]
+    [messageApi, notify, resolveErrorText, showLocalError]
   );
 
   const browserLocked = fileBrowserStore.isBusy || fileEditorStore.isSaving;
@@ -281,7 +261,7 @@ export const FileBrowserPage = observer(() => {
             disabled={browserLocked}
             readOnly={sourceReadOnly}
             error={listingError}
-            messageApi={messageApi}
+            toasts={toasts}
             onNavigate={handleNavigate}
             onFileOpen={handleFileOpen}
             onDownload={handleDownload}
@@ -295,7 +275,7 @@ export const FileBrowserPage = observer(() => {
         </FileBrowserLayout>
       </div>
 
-      <UploadModal
+      <FileBrowserUploadModal
         open={uploadModalOpen}
         disabled={fileEditorStore.isSaving || sourceReadOnly}
         onClose={() => setUploadModalOpen(false)}
@@ -303,12 +283,14 @@ export const FileBrowserPage = observer(() => {
         uploads={fileBrowserStore.uploads}
         onCancelUpload={(id) => fileBrowserStore.cancelUpload(id)}
         onClearFinished={() => fileBrowserStore.clearFinishedUploads()}
+        formatError={(code) => formatLocalFilesystemError(t, code)}
       />
 
       <FileEditorModal
         open={editorModalOpen}
         readOnly={fileBrowserStore.isSourceReadOnly(fileEditorStore.source)}
         onClose={handleEditorClose}
+        toasts={toasts}
       />
     </div>
   );

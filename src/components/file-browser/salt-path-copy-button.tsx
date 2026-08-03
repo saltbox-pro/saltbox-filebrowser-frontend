@@ -1,14 +1,18 @@
 import { CopyOutlined } from "@ant-design/icons";
-import { joinFileBrowserPathChild } from "@saltbox/saltbox-frontend-common";
+import {
+  joinFileBrowserPathChild,
+  type ShowFileBrowserErrorByCode,
+  type ShowFileBrowserSuccessByKey,
+} from "@saltbox/saltbox-frontend-common";
 import { Button } from "antd";
-import type { MessageInstance } from "antd/es/message/interface";
 import { memo, type MouseEvent } from "react";
-import { useTranslation } from "react-i18next";
 
 interface SaltPathCopyButtonProps {
   name: string;
   currentPath: string;
-  messageApi: MessageInstance;
+  copySaltPathLabel: string;
+  showErrorByCode: ShowFileBrowserErrorByCode;
+  showSuccessByKey: ShowFileBrowserSuccessByKey;
 }
 
 function buildSaltPath(currentPath: string, name: string): string {
@@ -19,20 +23,23 @@ function buildSaltPath(currentPath: string, name: string): string {
 export const SaltPathCopyButton = memo(function SaltPathCopyButton({
   name,
   currentPath,
-  messageApi,
+  copySaltPathLabel,
+  showErrorByCode,
+  showSuccessByKey,
 }: SaltPathCopyButtonProps) {
-  const { t } = useTranslation();
-
   const handleCopy = (event: MouseEvent) => {
     event.stopPropagation();
     const saltPath = buildSaltPath(currentPath, name);
     navigator.clipboard
       .writeText(saltPath)
       .then(() => {
-        messageApi.success(t("notifications.saltPathCopied", { path: saltPath }));
+        showSuccessByKey({
+          key: "salt-path-copied",
+          params: { path: saltPath },
+        });
       })
       .catch(() => {
-        messageApi.error(t("notifications.saltPathCopyError"));
+        showErrorByCode({ code: "salt-path-copy-error" });
       });
   };
 
@@ -42,8 +49,8 @@ export const SaltPathCopyButton = memo(function SaltPathCopyButton({
       icon={<CopyOutlined />}
       shape="circle"
       onClick={handleCopy}
-      title={t("actions.copySaltPath")}
-      aria-label={t("actions.copySaltPath")}
+      title={copySaltPathLabel}
+      aria-label={copySaltPathLabel}
     />
   );
 });

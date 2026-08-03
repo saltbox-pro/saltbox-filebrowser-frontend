@@ -2,6 +2,7 @@ import {
   isGlobalServerError,
   isFileBrowserSafePathSegment,
   joinFileBrowserPathChild,
+  type FileBrowserUploadItem,
 } from "@saltbox/saltbox-frontend-common";
 import { action, computed, makeObservable, observable, runInAction } from "mobx";
 
@@ -27,11 +28,7 @@ export interface FileEntry {
   isDirectory: boolean;
 }
 
-export interface UploadProgress {
-  fileName: string;
-  loaded: number;
-  total: number;
-  status: "uploading" | "done" | "error";
+export interface UploadProgress extends FileBrowserUploadItem {
   error?: FilesystemErrorCode;
   abortController: AbortController;
 }

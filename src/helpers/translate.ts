@@ -1,12 +1,10 @@
-import { getFileBrowserErrorI18nKey } from "@saltbox/saltbox-frontend-common";
 import type { TFunction } from "i18next";
 
-import { resolveFilesystemErrorCode, type FilesystemErrorCode } from "./filesystem-error";
+import type { FilesystemErrorCode } from "./filesystem-error";
 
 const LOCAL_ERROR_KEYS: Partial<Record<FilesystemErrorCode, string>> = {
   "fetch-user": "errors.fetchUser",
   "fetch-resource": "errors.fetchResource",
-  "upload-chunk": "errors.uploadChunk",
   "fetch-file-content": "errors.fetchFileContent",
   "server-error": "errors.serverError",
   "service-unavailable": "errors.serviceUnavailable",
@@ -14,28 +12,20 @@ const LOCAL_ERROR_KEYS: Partial<Record<FilesystemErrorCode, string>> = {
   "no-source": "errors.noSource",
   "read-only-source": "errors.readOnlySource",
   "invalid-name": "errors.invalidName",
-  "upload-cancelled": "upload.cancelled",
-  "download-error": "download.error",
 };
 
-export function formatFilesystemError(
+export function formatLocalFilesystemError(
   t: TFunction<"base">,
-  tCommon: TFunction<"common">,
-  errorCode: FilesystemErrorCode
-): string {
-  const commonKey = getFileBrowserErrorI18nKey(errorCode);
-  if (commonKey != null) {
-    return tCommon(commonKey);
-  }
-  const localKey = LOCAL_ERROR_KEYS[errorCode];
-  return localKey != null ? t(localKey) : errorCode;
+  errorCode: string
+): string | undefined {
+  const localKey = LOCAL_ERROR_KEYS[errorCode as FilesystemErrorCode];
+  return localKey != null ? t(localKey) : undefined;
 }
 
-export function formatUnknownFilesystemError(
+export function resolveFilesystemErrorText(
+  translateError: (code: string) => string | undefined,
   t: TFunction<"base">,
-  tCommon: TFunction<"common">,
-  error: unknown,
-  fallback: FilesystemErrorCode
+  code: string
 ): string {
-  return formatFilesystemError(t, tCommon, resolveFilesystemErrorCode(error, fallback));
+  return translateError(code) ?? formatLocalFilesystemError(t, code) ?? code;
 }

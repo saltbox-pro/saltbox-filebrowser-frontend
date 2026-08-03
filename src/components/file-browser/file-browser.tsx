@@ -1,14 +1,13 @@
 import {
   FileBrowserActionsPanel,
   FileBrowserView,
+  MatIcon,
   isTextFile,
   type FileBrowserItem,
-  MatIcon,
+  type FileBrowserNotificationToasts,
 } from "@saltbox/saltbox-frontend-common";
 import { Button } from "antd";
-import type { MessageInstance } from "antd/es/message/interface";
 import { useCallback, useMemo } from "react";
-import { useTranslation } from "react-i18next";
 
 import type { FileEntry } from "saltbox-filesystem/store/file-browser-store";
 
@@ -22,7 +21,7 @@ interface FileBrowserProps {
   disabled?: boolean;
   readOnly?: boolean;
   error?: string;
-  messageApi: MessageInstance;
+  toasts: FileBrowserNotificationToasts;
   onNavigate: (path: string) => void;
   onFileOpen: (name: string) => void;
   onDownload: (name: string) => void;
@@ -41,7 +40,7 @@ export function FileBrowser({
   disabled = false,
   readOnly = false,
   error,
-  messageApi,
+  toasts,
   onNavigate,
   onFileOpen,
   onDownload,
@@ -52,7 +51,7 @@ export function FileBrowser({
   onUploadClick,
   onReload,
 }: FileBrowserProps) {
-  const { t } = useTranslation();
+  const { actionLabels, showLocalError, showErrorByCode, showSuccessByKey } = toasts;
 
   const items = useMemo(
     () =>
@@ -87,7 +86,7 @@ export function FileBrowser({
       onCreateFolder={readOnly ? undefined : onCreateFolder}
       onCreateFile={readOnly ? undefined : onCreateFile}
       onReload={onReload}
-      onSubmitError={(message) => messageApi.error(message)}
+      onSubmitError={showLocalError}
       toolbarLeading={
         readOnly ? undefined : (
           <Button
@@ -102,12 +101,18 @@ export function FileBrowser({
               onUploadClick();
             }}
           >
-            {t("actions.upload")}
+            {actionLabels.upload}
           </Button>
         )
       }
       renderLeadingActions={(item) => (
-        <SaltPathCopyButton currentPath={currentPath} name={item.name} messageApi={messageApi} />
+        <SaltPathCopyButton
+          currentPath={currentPath}
+          name={item.name}
+          copySaltPathLabel={actionLabels.copySaltPath}
+          showErrorByCode={showErrorByCode}
+          showSuccessByKey={showSuccessByKey}
+        />
       )}
     >
       {({ toolbar, renderRowActions }) => (
