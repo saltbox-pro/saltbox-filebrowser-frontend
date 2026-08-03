@@ -1,5 +1,6 @@
 import {
   FileBrowserActionsPanel,
+  FileBrowserCopyPathButton,
   FileBrowserView,
   MatIcon,
   isTextFile,
@@ -9,10 +10,10 @@ import {
 import { Button } from "antd";
 import { useCallback, useMemo } from "react";
 
+import { SALT_PATH_PREFIX } from "saltbox-filesystem/constants/salt-path";
 import type { FileEntry } from "saltbox-filesystem/store/file-browser-store";
 
 import { toFileBrowserItem } from "./map-to-file-browser-item";
-import { SaltPathCopyButton } from "./salt-path-copy-button";
 
 interface FileBrowserProps {
   currentPath: string;
@@ -51,7 +52,7 @@ export function FileBrowser({
   onUploadClick,
   onReload,
 }: FileBrowserProps) {
-  const { actionLabels, showLocalError, showErrorByCode, showSuccessByKey } = toasts;
+  const { actionLabels, showLocalError, showSuccessByKey, showErrorByCode } = toasts;
 
   const items = useMemo(
     () =>
@@ -106,12 +107,13 @@ export function FileBrowser({
         )
       }
       renderLeadingActions={(item) => (
-        <SaltPathCopyButton
-          currentPath={currentPath}
-          name={item.name}
-          copySaltPathLabel={actionLabels.copySaltPath}
-          showErrorByCode={showErrorByCode}
+        <FileBrowserCopyPathButton
+          path={item.path}
+          pathCopyPrefix={SALT_PATH_PREFIX}
+          title={actionLabels.copySaltPath}
+          appearance="row"
           showSuccessByKey={showSuccessByKey}
+          showErrorByCode={showErrorByCode}
         />
       )}
     >
@@ -123,7 +125,10 @@ export function FileBrowser({
           isLoading={isLoading}
           navigationDisabled={interactionLocked}
           error={error}
-          showActionsColumn
+          pathCopyPrefix={SALT_PATH_PREFIX}
+          pathCopyTitle={actionLabels.copySaltPath}
+          showSuccessByKey={showSuccessByKey}
+          showErrorByCode={showErrorByCode}
           toolbar={toolbar}
           onNavigate={onNavigate}
           onItemClick={handleItemClick}

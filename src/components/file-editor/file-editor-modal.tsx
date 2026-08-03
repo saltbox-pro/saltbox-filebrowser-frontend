@@ -9,6 +9,7 @@ import * as monaco from "monaco-editor";
 import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
+import { SALT_PATH_PREFIX } from "saltbox-filesystem/constants/salt-path";
 import { resolveFilesystemErrorText } from "saltbox-filesystem/helpers/translate";
 import { fileEditorStore } from "saltbox-filesystem/store/file-editor-store";
 
@@ -25,14 +26,11 @@ interface FileEditorModalProps {
 export const FileEditorModal = observer(
   ({ open, readOnly = false, onClose, toasts }: FileEditorModalProps) => {
     const { t } = useTranslation();
-    const { showLocalError, showSuccessByKey, translateError, translateSuccess, actionLabels } =
+    const { showLocalError, showSuccessByKey, showErrorByCode, translateError, actionLabels } =
       toasts;
 
     const filePath = fileEditorStore.filePath;
     const isEditing = fileEditorStore.mode === "edit";
-
-    const saltPath =
-      filePath.length === 0 ? "" : `salt://${filePath.replace(/\/+/g, "/").replace(/^\//, "")}`;
 
     const resolveErrorText = useCallback(
       (code: string) => resolveFilesystemErrorText(translateError, t, code),
@@ -73,12 +71,10 @@ export const FileEditorModal = observer(
         open={open}
         fileName={fileEditorStore.fileName}
         filePath={filePath}
-        pathCopyText={saltPath}
+        pathCopyPrefix={SALT_PATH_PREFIX}
         pathCopyTitle={actionLabels.copySaltPath}
-        pathCopySuccessMessage={
-          translateSuccess("salt-path-copied", { path: saltPath }) ?? saltPath
-        }
-        pathCopyErrorMessage={translateError("salt-path-copy-error")}
+        showSuccessByKey={showSuccessByKey}
+        showErrorByCode={showErrorByCode}
         language={fileEditorStore.language}
         content={isEditing ? fileEditorStore.currentContent : fileEditorStore.originalContent}
         loading={fileEditorStore.isLoading}
