@@ -1,4 +1,5 @@
 import {
+  hasActiveFileBrowserUpload,
   isGlobalServerError,
   isFileBrowserSafePathSegment,
   joinFileBrowserPathChild,
@@ -54,7 +55,16 @@ class FileBrowserStore {
   }
 
   @computed get hasActiveUploads(): boolean {
-    return Array.from(this.uploads.values()).some((u) => u.status === "uploading");
+    return hasActiveFileBrowserUpload(this.uploads);
+  }
+
+  @computed get activeUploadTargetDirectory(): string | null {
+    for (const upload of this.uploads.values()) {
+      if (upload.status === "uploading" || upload.status === "queued") {
+        return upload.targetDirectory ?? null;
+      }
+    }
+    return null;
   }
 
   @computed get isMutating(): boolean {
@@ -295,21 +305,43 @@ class FileBrowserStore {
     const abortController = new AbortController();
     let wroteBytes = false;
 
+    const rejectWithListError = (
+      errorCode: FilesystemErrorCode,
+      targetDirectory: string
+    ): never => {
+      this.uploads.set(uploadId, {
+        fileName: file.name,
+        loaded: 0,
+        total: file.size,
+        status: "error",
+        error: errorCode,
+        abortController,
+        targetDirectory,
+      });
+      throw new FilesystemError(errorCode);
+    };
+
     try {
       const location = this.assertCanUpload();
-      if (!isFileBrowserSafePathSegment(file.name)) {
-        throw new FilesystemError("invalid-name");
-      }
-      const filePath = joinFileBrowserPathChild(location.path, file.name);
 
-      runInAction(() => {
-        this.uploads.set(uploadId, {
-          fileName: file.name,
-          loaded: 0,
-          total: file.size,
-          status: "uploading",
-          abortController,
-        });
+      if (!isFileBrowserSafePathSegment(file.name)) {
+        rejectWithListError("invalid-name", location.path);
+      }
+
+      let filePath: string;
+      try {
+        filePath = joinFileBrowserPathChild(location.path, file.name);
+      } catch {
+        rejectWithListError("invalid-name", location.path);
+      }
+
+      this.uploads.set(uploadId, {
+        fileName: file.name,
+        loaded: 0,
+        total: file.size,
+        status: "uploading",
+        abortController,
+        targetDirectory: location.path,
       });
 
       if (file.size <= CHUNK_THRESHOLD) {
@@ -364,6 +396,9 @@ class FileBrowserStore {
         if (!upload) {
           return;
         }
+        if (upload.status === "error") {
+          return;
+        }
         upload.status = "error";
         if (!isGlobalServerError(e)) {
           upload.error = resolveFilesystemErrorCode(e, "upload-chunk");
@@ -389,7 +424,7 @@ class FileBrowserStore {
   @action
   cancelUpload(uploadId: string): void {
     const upload = this.uploads.get(uploadId);
-    if (upload && upload.status === "uploading") {
+    if (upload && (upload.status === "uploading" || upload.status === "queued")) {
       upload.abortController.abort();
     }
   }
@@ -397,9 +432,10 @@ class FileBrowserStore {
   @action
   clearFinishedUploads(): void {
     for (const [id, upload] of this.uploads) {
-      if (upload.status !== "uploading") {
-        this.uploads.delete(id);
+      if (upload.status === "uploading" || upload.status === "queued") {
+        continue;
       }
+      this.uploads.delete(id);
     }
   }
 

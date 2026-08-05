@@ -21,6 +21,8 @@ interface FileBrowserProps {
   isLoading: boolean;
   disabled?: boolean;
   readOnly?: boolean;
+  uploadDisabled?: boolean;
+  uploadSoftLocked?: boolean;
   error?: string;
   toasts: FileBrowserNotificationToasts;
   onNavigate: (path: string) => void;
@@ -40,6 +42,8 @@ export function FileBrowser({
   isLoading,
   disabled = false,
   readOnly = false,
+  uploadDisabled = false,
+  uploadSoftLocked = false,
   error,
   toasts,
   onNavigate,
@@ -88,15 +92,16 @@ export function FileBrowser({
       onCreateFile={readOnly ? undefined : onCreateFile}
       onReload={onReload}
       onSubmitError={showLocalError}
-      toolbarLeading={
+      toolbarTrailing={
         readOnly ? undefined : (
           <Button
             type="primary"
             icon={<MatIcon icon="upload_file" size="small" />}
-            aria-disabled={interactionLocked || undefined}
-            tabIndex={interactionLocked ? -1 : undefined}
+            disabled={uploadDisabled}
+            aria-disabled={uploadSoftLocked || undefined}
+            tabIndex={uploadSoftLocked ? -1 : undefined}
             onClick={() => {
-              if (interactionLocked) {
+              if (uploadSoftLocked || uploadDisabled) {
                 return;
               }
               onUploadClick();

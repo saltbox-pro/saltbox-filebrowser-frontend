@@ -25,7 +25,7 @@ import { appStore } from "./app-store";
 import { envStore } from "./env-store";
 import { i18nStore } from "./i18n-store";
 
-const CHUNK_SIZE = 1 * 1024 * 1024;
+const CHUNK_SIZE = 5 * 1024 * 1024;
 
 export interface ChunkedUploadOptions {
   file: File;
