@@ -34,6 +34,7 @@ import {
   formatLocalFilesystemError,
   resolveFilesystemErrorText,
 } from "saltbox-filesystem/helpers/translate";
+import { useFileBrowserPageLocation } from "saltbox-filesystem/hooks/use-file-browser-page-location";
 import { fileBrowserStore } from "saltbox-filesystem/store/file-browser-store";
 import { fileEditorStore } from "saltbox-filesystem/store/file-editor-store";
 
@@ -44,7 +45,8 @@ export const FileBrowserPage = observer(() => {
   const [messageApi, messageContextHolder] = message.useMessage();
   const [notificationApi, notificationContextHolder] = notification.useNotification();
   const toasts = useFileBrowserNotificationToasts(messageApi);
-  const { showLocalError, showSuccessByKey, translateError, downloadLabels } = toasts;
+  const { showLocalError, showSuccessByKey, showErrorByCode, translateError, downloadLabels } =
+    toasts;
   const [uploadModalOpen, setUploadModalOpenState] = useState(false);
   const uploadModalOpenRef = useRef(uploadModalOpen);
   const setUploadModalOpen = useCallback((open: boolean) => {
@@ -85,15 +87,6 @@ export const FileBrowserPage = observer(() => {
   const listingError = fileBrowserStore.error
     ? resolveErrorText(fileBrowserStore.error)
     : undefined;
-
-  useEffect(() => {
-    fileBrowserStore.loadSources().then((ok) => {
-      if (ok) {
-        return fileBrowserStore.loadDirectory();
-      }
-      return undefined;
-    });
-  }, []);
 
   const sourceReadOnly = fileBrowserStore.isCurrentSourceReadOnly;
 
@@ -142,6 +135,15 @@ export const FileBrowserPage = observer(() => {
     setEditorModalOpen(false);
     fileEditorStore.reset();
   }, []);
+
+  useFileBrowserPageLocation({
+    currentPath: fileBrowserStore.currentPath,
+    currentSource: fileBrowserStore.currentSource,
+    editorOpen: editorModalOpen,
+    editorFileName: fileEditorStore.fileName,
+    onOpenFile: handleFileOpen,
+    showErrorByCode,
+  });
 
   const handleDownload = useCallback(
     async (name: string) => {

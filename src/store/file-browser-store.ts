@@ -95,7 +95,9 @@ class FileBrowserStore {
 
   @action
   async loadSources(): Promise<boolean> {
-    this.sourcesLoading = true;
+    if (this.sources.length === 0) {
+      this.sourcesLoading = true;
+    }
     try {
       const scopes = await apiFilesystemStore.getScopes();
       runInAction(() => {
