@@ -1,5 +1,6 @@
 import {
   applyFileBrowserLocationQuery,
+  clearFileBrowserLocationQueryFromWindow,
   joinFileBrowserPathChild,
   readFileBrowserLocationQuery,
   type FileBrowserLocationQuery,
@@ -22,10 +23,14 @@ interface UseFileBrowserPageLocationOptions {
 
 function writeLocationToSearchParams(
   setSearchParams: ReturnType<typeof useSearchParams>[1],
-  location: { source: string | null; path: string | null; file: string | null }
+  location: { source: string | null; path: string | null; file: string | null },
+  isCancelled?: () => boolean
 ): void {
   setSearchParams(
     (prev) => {
+      if (isCancelled?.()) {
+        return prev;
+      }
       const current = readFileBrowserLocationQuery(prev);
       if (
         current.source === location.source &&
@@ -140,7 +145,11 @@ export function useFileBrowserPageLocation({
             file: openedFileName,
           };
           appliedLocationKeyRef.current = toLocationKey(nextLocation);
-          writeLocationToSearchParams(setSearchParams, nextLocation);
+          writeLocationToSearchParams(
+            setSearchParams,
+            nextLocation,
+            () => mountGeneration !== mountGenerationRef.current
+          );
         }
       }
     };
@@ -163,6 +172,14 @@ export function useFileBrowserPageLocation({
       file: editorOpen && editorFileName.length > 0 ? editorFileName : null,
     };
     appliedLocationKeyRef.current = toLocationKey(nextLocation);
-    writeLocationToSearchParams(setSearchParams, nextLocation);
+    writeLocationToSearchParams(setSearchParams, nextLocation, () => suppressWriteBackRef.current);
   }, [currentPath, currentSource, editorFileName, editorOpen, setSearchParams]);
+
+  useEffect(() => {
+    return () => {
+      suppressWriteBackRef.current = true;
+      mountGenerationRef.current += 1;
+      clearFileBrowserLocationQueryFromWindow();
+    };
+  }, []);
 }

@@ -8,11 +8,10 @@ import {
   joinFileBrowserPathChild,
   runWithFileBrowserDownloadNotification,
   useFileBrowserNotificationToasts,
-  useFileBrowserUploadNotification,
 } from "@saltbox/saltbox-frontend-common";
 import { message, notification } from "antd";
 import { observer } from "mobx-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { FileBrowser } from "saltbox-filesystem/components/file-browser/file-browser";
@@ -47,11 +46,9 @@ export const FileBrowserPage = observer(() => {
   const toasts = useFileBrowserNotificationToasts(messageApi);
   const { showLocalError, showSuccessByKey, showErrorByCode, translateError, downloadLabels } =
     toasts;
-  const [uploadModalOpen, setUploadModalOpenState] = useState(false);
-  const uploadModalOpenRef = useRef(uploadModalOpen);
+  const uploadModalOpen = fileBrowserStore.uploadModalOpen;
   const setUploadModalOpen = useCallback((open: boolean) => {
-    uploadModalOpenRef.current = open;
-    setUploadModalOpenState(open);
+    fileBrowserStore.setUploadModalOpen(open);
   }, []);
   const [editorModalOpen, setEditorModalOpen] = useState(false);
 
@@ -60,19 +57,14 @@ export const FileBrowserPage = observer(() => {
     [t, translateError]
   );
 
-  const { panel: uploadNotificationPanel, markPanelPending } = useFileBrowserUploadNotification({
-    open: uploadModalOpen,
-    uploads: fileBrowserStore.uploads,
-    onCancelUpload: (id) => fileBrowserStore.cancelUpload(id),
-    onClearFinished: () => fileBrowserStore.clearFinishedUploads(),
-    formatError: (code) => formatLocalFilesystemError(t, code),
-  });
+  useEffect(() => {
+    return () => {
+      fileBrowserStore.setUploadModalOpen(false);
+    };
+  }, []);
 
   const closeUploadModal = () => {
     setUploadModalOpen(false);
-    if (fileBrowserStore.uploads.size > 0) {
-      markPanelPending();
-    }
   };
 
   const notify = useMemo<MutationNotify>(
@@ -147,11 +139,7 @@ export const FileBrowserPage = observer(() => {
 
   const handleDownload = useCallback(
     async (name: string) => {
-      if (
-        fileBrowserStore.isMutating ||
-        fileBrowserStore.hasActiveUploads ||
-        fileEditorStore.isSaving
-      ) {
+      if (fileBrowserStore.isMutating || fileEditorStore.isSaving) {
         showLocalError(resolveErrorText("operation-busy"));
         return;
       }
@@ -250,8 +238,8 @@ export const FileBrowserPage = observer(() => {
           code === "no-source" ||
           code === "read-only-source" ||
           code === "listing-reload-error";
-        if (alwaysToast || !uploadModalOpenRef.current) {
-          showLocalError(`${resolveErrorText(code)}: "${file.name}"`);
+        if (alwaysToast || !fileBrowserStore.uploadModalOpen) {
+          showLocalError(resolveErrorText(code));
         }
         if (fileBrowserStore.hasPendingListingReload) {
           scheduleListingReload(() => fileBrowserStore.reloadListingAfterMutation(), notify);
@@ -282,7 +270,6 @@ export const FileBrowserPage = observer(() => {
     <div className={styles.page}>
       {messageContextHolder}
       {notificationContextHolder}
-      {uploadNotificationPanel}
       <PageHeader title={t("browser.title")} />
 
       <div className={styles.content}>

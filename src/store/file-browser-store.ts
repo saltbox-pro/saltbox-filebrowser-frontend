@@ -3,6 +3,7 @@ import {
   isGlobalServerError,
   isFileBrowserSafePathSegment,
   joinFileBrowserPathChild,
+  shouldEmitUploadProgress,
   type FileBrowserUploadItem,
 } from "@saltbox/saltbox-frontend-common";
 import { action, computed, makeObservable, observable, runInAction } from "mobx";
@@ -43,6 +44,7 @@ class FileBrowserStore {
   @observable sourcesLoading: boolean = false;
   @observable error: FilesystemErrorCode | undefined;
   @observable uploads: Map<string, UploadProgress> = new Map();
+  @observable uploadModalOpen = false;
   @observable private mutationCount = 0;
   @observable private pendingListingReloadCount = 0;
 
@@ -73,11 +75,7 @@ class FileBrowserStore {
 
   @computed get isBusy(): boolean {
     return (
-      this.isLoading ||
-      this.sourcesLoading ||
-      this.isMutating ||
-      this.hasActiveUploads ||
-      this.pendingListingReloadCount > 0
+      this.isLoading || this.sourcesLoading || this.isMutating || this.pendingListingReloadCount > 0
     );
   }
 
@@ -355,6 +353,7 @@ class FileBrowserStore {
         });
         wroteBytes = true;
       } else {
+        let lastProgressAt: number | null = null;
         try {
           await apiFilesystemStore.uploadFileChunked(location.source, filePath, {
             file,
@@ -362,6 +361,18 @@ class FileBrowserStore {
             signal: abortController.signal,
             onProgress: (loaded) => {
               wroteBytes = loaded > 0;
+              const now = Date.now();
+              if (
+                !shouldEmitUploadProgress({
+                  loaded,
+                  total: file.size,
+                  lastEmittedAt: lastProgressAt,
+                  now,
+                })
+              ) {
+                return;
+              }
+              lastProgressAt = now;
               runInAction(() => {
                 const upload = this.uploads.get(uploadId);
                 if (upload) {
@@ -422,6 +433,11 @@ class FileBrowserStore {
       });
     });
   };
+
+  @action
+  setUploadModalOpen(open: boolean): void {
+    this.uploadModalOpen = open;
+  }
 
   @action
   cancelUpload(uploadId: string): void {

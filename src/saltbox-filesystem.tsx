@@ -8,6 +8,7 @@ import Root from "./root.component";
 import { appStore } from "./store/app-store";
 import { envStore } from "./store/env-store";
 import { i18nStore } from "./store/i18n-store";
+import { ensureFileBrowserUploadOverlayMounted } from "./ui/file-browser-upload-overlay";
 
 const name = "saltbox-filesystem-frontend";
 const path = "/filesystem";
@@ -32,6 +33,7 @@ const init = (authStore, services, localeStore, pluginsStore) => {
   autorun(() => {
     i18nStore.setLanguage(localeStore.currentLocale);
   });
+  ensureFileBrowserUploadOverlayMounted();
 };
 
 export const settingsConfig = {
