@@ -1,10 +1,3 @@
-import {
-  AppLanguage,
-  ServerErrorEventDetail,
-  UiEvent,
-  markGlobalServerError,
-  publish,
-} from "@saltbox/saltbox-frontend-common";
 import { computed, makeObservable, observable } from "mobx";
 
 import {
@@ -18,12 +11,8 @@ import {
 } from "saltbox-filesystem/helpers/filesystem-error";
 import { FileInfo, SourceScope } from "saltbox-filesystem/shared/types";
 
-import enBase from "../locales/en/base.json";
-import ruBase from "../locales/ru/base.json";
-
 import { appStore } from "./app-store";
 import { envStore } from "./env-store";
-import { i18nStore } from "./i18n-store";
 
 const CHUNK_SIZE = 5 * 1024 * 1024;
 
@@ -32,11 +21,6 @@ export interface ChunkedUploadOptions {
   override?: boolean;
   onProgress?: (loaded: number, total: number) => void;
   signal?: AbortSignal;
-}
-
-function getGlobalServerErrorMessage(code: FilesystemErrorCode): string {
-  const errors = i18nStore.currentLanguage === AppLanguage.RU ? ruBase.errors : enBase.errors;
-  return code === "service-unavailable" ? errors.serviceUnavailable : errors.serverError;
 }
 
 class ApiFilesystemStore {
@@ -64,8 +48,7 @@ class ApiFilesystemStore {
   private throwResponseError(
     response: Response,
     fallback: FilesystemErrorCode,
-    conflict?: FilesystemErrorCode,
-    method = ""
+    conflict?: FilesystemErrorCode
   ): never {
     const code: FilesystemErrorCode =
       response.status === 409
@@ -76,23 +59,7 @@ class ApiFilesystemStore {
             ? "server-error"
             : fallback;
 
-    const isServerError = response.status >= 500 && response.status < 600;
-    if (isServerError) {
-      publish<ServerErrorEventDetail>(UiEvent.ServerError, {
-        status: response.status,
-        statusText: response.statusText || "",
-        message: getGlobalServerErrorMessage(code),
-        url: response.url,
-        method,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    const error = new FilesystemError(code);
-    if (isServerError) {
-      markGlobalServerError(error);
-    }
-    throw error;
+    throw new FilesystemError(code);
   }
 
   async getScopes(): Promise<SourceScope[]> {
@@ -103,7 +70,7 @@ class ApiFilesystemStore {
     const response = await fetch(`${this.basePath}/public/api/users?${params}`, {
       headers: this.authHeaders,
     });
-    if (!response.ok) this.throwResponseError(response, "fetch-user", undefined, "GET");
+    if (!response.ok) this.throwResponseError(response, "fetch-user");
     const data = await response.json();
     return data?.scopes || [];
   }
@@ -116,7 +83,7 @@ class ApiFilesystemStore {
     const response = await fetch(`${this.basePath}/api/resources?${params}`, {
       headers: this.authHeaders,
     });
-    if (!response.ok) this.throwResponseError(response, "fetch-resource", undefined, "GET");
+    if (!response.ok) this.throwResponseError(response, "fetch-resource");
     return response.json();
   }
 
@@ -156,8 +123,7 @@ class ApiFilesystemStore {
       this.throwResponseError(
         response,
         options?.errorCode ?? CREATE_ERROR_CODE,
-        options?.override ? undefined : NAME_ALREADY_EXISTS_CODE,
-        "POST"
+        options?.override ? undefined : NAME_ALREADY_EXISTS_CODE
       );
     }
   }
@@ -202,8 +168,7 @@ class ApiFilesystemStore {
         this.throwResponseError(
           response,
           "upload-chunk",
-          override ? undefined : NAME_ALREADY_EXISTS_CODE,
-          "POST"
+          override ? undefined : NAME_ALREADY_EXISTS_CODE
         );
       }
 
@@ -222,7 +187,7 @@ class ApiFilesystemStore {
       headers: this.authHeaders,
     });
     if (!response.ok) {
-      this.throwResponseError(response, REMOVE_ERROR_CODE, undefined, "DELETE");
+      this.throwResponseError(response, REMOVE_ERROR_CODE);
     }
   }
 
@@ -241,7 +206,7 @@ class ApiFilesystemStore {
     const response = await fetch(url, {
       headers: this.authHeaders,
     });
-    if (!response.ok) this.throwResponseError(response, "fetch-file-content", undefined, "GET");
+    if (!response.ok) this.throwResponseError(response, "fetch-file-content");
     return response.text();
   }
 
@@ -278,7 +243,7 @@ class ApiFilesystemStore {
       headers: this.authHeaders,
     });
     if (!response.ok) {
-      this.throwResponseError(response, RENAME_ERROR_CODE, NAME_ALREADY_EXISTS_CODE, "PATCH");
+      this.throwResponseError(response, RENAME_ERROR_CODE, NAME_ALREADY_EXISTS_CODE);
     }
   }
 
@@ -291,7 +256,7 @@ class ApiFilesystemStore {
       headers: this.authHeaders,
       signal,
     });
-    if (!response.ok) this.throwResponseError(response, "download-error", undefined, "GET");
+    if (!response.ok) this.throwResponseError(response, "download-error");
 
     if (signal?.aborted) {
       throw new DOMException("Aborted", "AbortError");
