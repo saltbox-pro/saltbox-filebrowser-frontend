@@ -1,6 +1,5 @@
 import {
   FileBrowserActionsPanel,
-  FileBrowserCopyPathButton,
   FileBrowserView,
   MatIcon,
   isTextFile,
@@ -111,18 +110,8 @@ export function FileBrowser({
           </Button>
         )
       }
-      renderLeadingActions={(item) => (
-        <FileBrowserCopyPathButton
-          path={item.path}
-          pathCopyPrefix={SALT_PATH_PREFIX}
-          title={actionLabels.copySaltPath}
-          appearance="row"
-          showSuccessByKey={showSuccessByKey}
-          showErrorByCode={showErrorByCode}
-        />
-      )}
     >
-      {({ toolbar, renderRowActions }) => (
+      {({ toolbar, rowActions }) => (
         <FileBrowserView
           tableId="filebrowser-files"
           currentPath={currentPath}
@@ -135,12 +124,12 @@ export function FileBrowser({
           showSuccessByKey={showSuccessByKey}
           showErrorByCode={showErrorByCode}
           toolbar={toolbar}
+          rowActions={rowActions}
           onNavigate={onNavigate}
           onItemClick={handleItemClick}
           isItemClickable={(item) =>
             item.kind === "directory" || isTextFile(item.name, item.iconHint)
           }
-          renderRowActions={renderRowActions}
         />
       )}
     </FileBrowserActionsPanel>
