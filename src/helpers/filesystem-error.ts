@@ -13,7 +13,11 @@ export const FILESYSTEM_ERROR_CODES = [
   "read-only-source",
   "invalid-name",
   "upload-cancelled",
+  "upload-already-in-progress",
   "download-error",
+  "download-cancelled",
+  "download-already-in-progress",
+  "file-too-large-to-download",
   "name-already-exists",
   "create-error",
   "file-write-error",
@@ -61,9 +65,16 @@ export function resolveFilesystemErrorCode(
     return "network-error";
   }
   if (error instanceof Error && error.name === "AbortError") {
-    return fallback === "upload-chunk" || fallback === "upload-cancelled"
-      ? "upload-cancelled"
-      : fallback;
+    if (fallback === "upload-chunk" || fallback === "upload-cancelled") {
+      return "upload-cancelled";
+    }
+    if (fallback === "download-error" || fallback === "download-cancelled") {
+      return "download-cancelled";
+    }
+    return fallback;
+  }
+  if (error instanceof Error && error.name === "BrowserFileDownloadTooLargeError") {
+    return "file-too-large-to-download";
   }
   return fallback;
 }

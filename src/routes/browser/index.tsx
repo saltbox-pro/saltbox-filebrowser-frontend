@@ -1,15 +1,17 @@
 import {
+  BrowserFileDownloadAbortError,
   FileBrowserLayout,
   FileBrowserSourceAside,
   FileBrowserUploadModal,
   PageHeader,
+  abortBrowserFileDownloadTarget,
+  createBrowserFileDownloadTarget,
   dismissFileBrowserToast,
   isGlobalServerError,
   joinFileBrowserPathChild,
-  runWithFileBrowserDownloadNotification,
   useFileBrowserNotificationToasts,
 } from "@saltbox/saltbox-frontend-common";
-import { message, notification } from "antd";
+import { message } from "antd";
 import { observer } from "mobx-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -42,10 +44,8 @@ import styles from "./browser-page.module.css";
 export const FileBrowserPage = observer(() => {
   const { t } = useTranslation();
   const [messageApi, messageContextHolder] = message.useMessage();
-  const [notificationApi, notificationContextHolder] = notification.useNotification();
   const toasts = useFileBrowserNotificationToasts(messageApi);
-  const { showLocalError, showSuccessByKey, showErrorByCode, translateError, downloadLabels } =
-    toasts;
+  const { showLocalError, showSuccessByKey, showErrorByCode, translateError } = toasts;
   const uploadModalOpen = fileBrowserStore.uploadModalOpen;
   const setUploadModalOpen = useCallback((open: boolean) => {
     fileBrowserStore.setUploadModalOpen(open);
@@ -139,22 +139,50 @@ export const FileBrowserPage = observer(() => {
 
   const handleDownload = useCallback(
     async (name: string) => {
-      if (fileBrowserStore.isMutating || fileEditorStore.isSaving) {
+      if (fileBrowserStore.isBusy || fileEditorStore.isSaving) {
         showLocalError(resolveErrorText("operation-busy"));
         return;
       }
 
-      await runWithFileBrowserDownloadNotification({
-        notificationApi,
-        itemName: name,
-        itemPath: joinFileBrowserPathChild(fileBrowserStore.currentPath, name),
-        labels: downloadLabels,
-        formatError: (error) =>
-          resolveErrorText(resolveFilesystemErrorCode(error, "download-error")),
-        download: (signal) => fileBrowserStore.downloadItem(name, signal),
-      });
+      const pinnedLocation = {
+        source: fileBrowserStore.currentSource,
+        directoryPath: fileBrowserStore.currentPath,
+      };
+      const claim = fileBrowserStore.claimDownload(name, pinnedLocation);
+      if (claim.ok === false) {
+        showLocalError(resolveErrorText(claim.error));
+        return;
+      }
+
+      let browserFileTarget;
+      try {
+        browserFileTarget = await createBrowserFileDownloadTarget(name);
+      } catch (error) {
+        fileBrowserStore.abandonDownloadClaim(claim.downloadId);
+        if (error instanceof BrowserFileDownloadAbortError) {
+          return;
+        }
+        showLocalError(resolveErrorText("download-error"));
+        return;
+      }
+
+      const claimed = fileBrowserStore.downloads.get(claim.downloadId);
+      if (claimed == null || claimed.status === "error" || claim.abortController.signal.aborted) {
+        abortBrowserFileDownloadTarget(browserFileTarget);
+        fileBrowserStore.finalizeUnstartedDownload(claim.downloadId);
+        return;
+      }
+
+      if (fileBrowserStore.isBusy || fileEditorStore.isSaving) {
+        abortBrowserFileDownloadTarget(browserFileTarget);
+        fileBrowserStore.abandonDownloadClaim(claim.downloadId);
+        showLocalError(resolveErrorText("operation-busy"));
+        return;
+      }
+
+      fileBrowserStore.downloadItem(claim.downloadId, name, browserFileTarget, pinnedLocation);
     },
-    [notificationApi, showLocalError, resolveErrorText, downloadLabels]
+    [showLocalError, resolveErrorText]
   );
 
   const handleRename = useCallback(
@@ -237,7 +265,9 @@ export const FileBrowserPage = observer(() => {
           code === "operation-busy" ||
           code === "no-source" ||
           code === "read-only-source" ||
-          code === "listing-reload-error";
+          code === "listing-reload-error" ||
+          code === "upload-already-in-progress" ||
+          code === "download-already-in-progress";
         if (alwaysToast || !fileBrowserStore.uploadModalOpen) {
           showLocalError(resolveErrorText(code));
         }
@@ -269,7 +299,6 @@ export const FileBrowserPage = observer(() => {
   return (
     <div className={styles.page}>
       {messageContextHolder}
-      {notificationContextHolder}
       <PageHeader title={t("browser.title")} />
 
       <div className={styles.content}>
@@ -300,6 +329,9 @@ export const FileBrowserPage = observer(() => {
             onNavigate={handleNavigate}
             onFileOpen={handleFileOpen}
             onDownload={handleDownload}
+            isDownloadDisabled={(item) => fileBrowserStore.isTransferLockedPath(item.path)}
+            canDelete={(item) => !fileBrowserStore.isTransferLockedPath(item.path)}
+            canRename={(item) => !fileBrowserStore.isTransferLockedPath(item.path)}
             onDelete={handleDelete}
             onRename={handleRename}
             onCreateFolder={handleCreateFolder}
