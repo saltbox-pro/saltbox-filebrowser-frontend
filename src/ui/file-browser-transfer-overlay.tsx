@@ -14,22 +14,24 @@ import { i18nStore } from "saltbox-filesystem/store/i18n-store";
 
 const OVERLAY_ELEMENT_ID = "saltbox-file-browser-transfer-overlay";
 
-const FileBrowserUploadNoticePublisher = observer(function FileBrowserUploadNoticePublisher() {
-  const { t } = useTranslation();
-  const { uploadLabels } = useFileBrowserMessages();
+const FileBrowserFileTransferNoticePublisher = observer(
+  function FileBrowserFileTransferNoticePublisher() {
+    const { t } = useTranslation();
+    const { uploadLabels } = useFileBrowserMessages();
 
-  useFileBrowserTransferNotification({
-    open: fileBrowserStore.uploadModalOpen,
-    transfers: fileBrowserStore.uploads,
-    onCancelTransfer: (id) => fileBrowserStore.cancelUpload(id),
-    onClearFinished: () => fileBrowserStore.clearFinishedUploads(),
-    formatError: (code) => formatLocalFilesystemError(t, code),
-    noticeKey: "file-browser-page-upload",
-    title: uploadLabels.title,
-  });
+    useFileBrowserTransferNotification({
+      open: fileBrowserStore.uploadModalOpen,
+      transfers: fileBrowserStore.uploads,
+      onCancelTransfer: (id) => fileBrowserStore.cancelUpload(id),
+      onClearFinished: () => fileBrowserStore.clearFinishedUploads(),
+      formatError: (code) => formatLocalFilesystemError(t, code),
+      noticeKey: "file-browser-page-upload",
+      title: uploadLabels.title,
+    });
 
-  return null;
-});
+    return null;
+  }
+);
 
 const FileBrowserDownloadNoticePublisher = observer(function FileBrowserDownloadNoticePublisher() {
   const { t } = useTranslation();
@@ -51,7 +53,7 @@ const FileBrowserDownloadNoticePublisher = observer(function FileBrowserDownload
 const FileBrowserTransferOverlayApp = observer(function FileBrowserTransferOverlayApp() {
   return (
     <SaltboxLocaleProvider locale={i18nStore.currentLanguage} resources={filesystemResources}>
-      <FileBrowserUploadNoticePublisher />
+      <FileBrowserFileTransferNoticePublisher />
       <FileBrowserDownloadNoticePublisher />
     </SaltboxLocaleProvider>
   );
