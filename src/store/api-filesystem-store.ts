@@ -1,5 +1,14 @@
+import {
+  abortBrowserFileDownloadTarget,
+  BrowserFileDownloadAbortError,
+  BrowserFileDownloadIncompleteError,
+  BrowserFileDownloadTooLargeError,
+  writeResponseToBrowserFile,
+  type BrowserFileDownloadTarget,
+} from "@saltbox/saltbox-frontend-common";
 import { computed, makeObservable, observable } from "mobx";
 
+import { UPLOAD_CHUNK_SIZE } from "saltbox-filesystem/constants/upload";
 import {
   FilesystemError,
   CREATE_ERROR_CODE,
@@ -13,8 +22,6 @@ import { FileInfo, SourceScope } from "saltbox-filesystem/shared/types";
 
 import { appStore } from "./app-store";
 import { envStore } from "./env-store";
-
-const CHUNK_SIZE = 5 * 1024 * 1024;
 
 export interface ChunkedUploadOptions {
   file: File;
@@ -149,7 +156,7 @@ class ApiFilesystemStore {
         throw new DOMException("Aborted", "AbortError");
       }
 
-      const end = Math.min(offset + CHUNK_SIZE, totalSize);
+      const end = Math.min(offset + UPLOAD_CHUNK_SIZE, totalSize);
       const chunk = file.slice(offset, end);
 
       const response = await fetch(url, {
@@ -247,38 +254,55 @@ class ApiFilesystemStore {
     }
   }
 
-  async downloadFile(source: string, filePath: string, signal?: AbortSignal): Promise<void> {
-    if (!this.basePath) {
-      throw new FilesystemError("download-error");
+  async downloadFile(
+    source: string,
+    filePath: string,
+    signal?: AbortSignal,
+    browserFileTarget?: BrowserFileDownloadTarget,
+    options?: {
+      knownTotal?: number;
+      onProgress?: (loaded: number, total: number) => void;
     }
-    const url = this.buildDownloadUrl(source, filePath);
-    const response = await fetch(url, {
-      headers: this.authHeaders,
-      signal,
-    });
-    if (!response.ok) this.throwResponseError(response, "download-error");
+  ): Promise<void> {
+    const target = browserFileTarget ?? { mode: "blob" as const };
 
-    if (signal?.aborted) {
-      throw new DOMException("Aborted", "AbortError");
+    try {
+      if (!this.basePath) {
+        throw new FilesystemError("download-error");
+      }
+      const url = this.buildDownloadUrl(source, filePath);
+      const response = await fetch(url, {
+        headers: this.authHeaders,
+        signal,
+      });
+      if (!response.ok) this.throwResponseError(response, "download-error");
+
+      if (signal?.aborted) {
+        throw new DOMException("Aborted", "AbortError");
+      }
+
+      const fileName = filePath.split("/").pop() || "download";
+      await writeResponseToBrowserFile({
+        response,
+        fileName,
+        target,
+        signal,
+        knownTotal: options?.knownTotal,
+        onProgress: options?.onProgress,
+      });
+    } catch (error) {
+      await abortBrowserFileDownloadTarget(target);
+      if (error instanceof BrowserFileDownloadAbortError || signal?.aborted) {
+        throw new DOMException("Aborted", "AbortError");
+      }
+      if (error instanceof BrowserFileDownloadIncompleteError) {
+        throw new FilesystemError("download-error");
+      }
+      if (error instanceof BrowserFileDownloadTooLargeError) {
+        throw new FilesystemError("file-too-large-to-download");
+      }
+      throw error;
     }
-
-    const blob = await response.blob();
-    if (signal?.aborted) {
-      throw new DOMException("Aborted", "AbortError");
-    }
-
-    const blobUrl = URL.createObjectURL(blob);
-    const fileName = filePath.split("/").pop() || "download";
-
-    const link = document.createElement("a");
-    link.href = blobUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.setTimeout(() => {
-      URL.revokeObjectURL(blobUrl);
-    }, 60_000);
   }
 }
 

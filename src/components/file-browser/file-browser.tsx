@@ -27,6 +27,9 @@ interface FileBrowserProps {
   onNavigate: (path: string) => void;
   onFileOpen: (name: string) => void;
   onDownload: (name: string) => void;
+  isDownloadDisabled?: (item: FileBrowserItem) => boolean;
+  canDelete?: (item: FileBrowserItem) => boolean;
+  canRename?: (item: FileBrowserItem) => boolean;
   onDelete: (name: string, kind: FileBrowserItem["kind"]) => void;
   onRename: (oldName: string, newName: string, kind: FileBrowserItem["kind"]) => void;
   onCreateFolder: (name: string) => void;
@@ -48,6 +51,9 @@ export function FileBrowser({
   onNavigate,
   onFileOpen,
   onDownload,
+  isDownloadDisabled,
+  canDelete,
+  canRename,
   onDelete,
   onRename,
   onCreateFolder,
@@ -84,7 +90,11 @@ export function FileBrowser({
   return (
     <FileBrowserActionsPanel
       disabled={interactionLocked}
+      downloadDisabled={interactionLocked}
       onDownload={(item) => onDownload(item.name)}
+      isDownloadDisabled={isDownloadDisabled}
+      canRename={readOnly ? undefined : canRename}
+      canDelete={readOnly ? undefined : canDelete}
       onRename={readOnly ? undefined : (item, newName) => onRename(item.name, newName, item.kind)}
       onDelete={readOnly ? undefined : (item) => onDelete(item.name, item.kind)}
       onCreateFolder={readOnly ? undefined : onCreateFolder}
