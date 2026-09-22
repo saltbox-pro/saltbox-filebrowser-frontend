@@ -1,6 +1,5 @@
-import type { FileBrowserLocationQuery } from "@saltbox/saltbox-frontend-common";
+import type { AppError, FileBrowserLocationQuery } from "@saltbox/saltbox-frontend-common";
 
-import type { FilesystemErrorCode } from "saltbox-filesystem/helpers/filesystem-error";
 import { fileBrowserStore } from "saltbox-filesystem/store/file-browser-store";
 
 export type MountFileBrowserLocationResult =
@@ -29,14 +28,9 @@ function normalizeLocationPath(path: string): string {
 }
 
 function classifyListingFailure(
-  error: FilesystemErrorCode | undefined
+  error: AppError | null
 ): "path-not-found" | "directory-unavailable" {
-  if (
-    error === "network-error" ||
-    error === "service-unavailable" ||
-    error === "server-error" ||
-    error === "fetch-user"
-  ) {
+  if (error?.kind === "network" || error?.kind === "unavailable" || error?.kind === "server") {
     return "directory-unavailable";
   }
   return "path-not-found";
@@ -48,6 +42,9 @@ export async function mountFileBrowserLocation(
 ): Promise<MountFileBrowserLocationResult> {
   const sourcesOk = await fileBrowserStore.loadSources();
   if (!sourcesOk) {
+    if (fileBrowserStore.sourcesLoad.error != null) {
+      return { ok: false, reason: "directory-unavailable" };
+    }
     return { ok: false, reason: "no-sources" };
   }
 
@@ -68,26 +65,18 @@ export async function mountFileBrowserLocation(
   await fileBrowserStore.loadDirectory(targetSource, targetPath);
 
   const listingOk =
-    fileBrowserStore.error == null &&
+    fileBrowserStore.directoryLoad.error == null &&
     fileBrowserStore.currentSource === targetSource &&
     normalizeLocationPath(fileBrowserStore.currentPath) === targetPath;
 
   if (!listingOk) {
-    const errorCode = fileBrowserStore.error;
-    const reason = classifyListingFailure(errorCode);
-    if (reason === "directory-unavailable") {
+    const reason = classifyListingFailure(fileBrowserStore.directoryLoad.error);
+    if (reason !== "directory-unavailable") {
       await fileBrowserStore.loadDirectory(targetSource || defaultSource, "/");
-      return {
-        ok: false,
-        reason,
-        requestedPath: targetPath,
-      };
     }
-
-    await fileBrowserStore.loadDirectory(targetSource || defaultSource, "/");
     return {
       ok: false,
-      reason: "path-not-found",
+      reason,
       requestedPath: targetPath,
     };
   }

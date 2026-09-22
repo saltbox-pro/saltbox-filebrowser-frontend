@@ -1,6 +1,8 @@
 import { loader } from "@monaco-editor/react";
 import {
   FileBrowserContentModal,
+  MutationErrorAlert,
+  runMutation,
   slsEditorMonacoLoader,
   type FileBrowserNotificationToasts,
 } from "@saltbox/saltbox-frontend-common";
@@ -10,7 +12,6 @@ import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SALT_PATH_PREFIX } from "saltbox-filesystem/constants/salt-path";
-import { resolveFilesystemErrorText } from "saltbox-filesystem/helpers/translate";
 import { fileEditorStore } from "saltbox-filesystem/store/file-editor-store";
 
 loader.config({ monaco });
@@ -26,16 +27,12 @@ interface FileEditorModalProps {
 export const FileEditorModal = observer(
   ({ open, readOnly = false, onClose, toasts }: FileEditorModalProps) => {
     const { t } = useTranslation();
-    const { showLocalError, showSuccessByKey, showErrorByCode, translateError, actionLabels } =
-      toasts;
+    const { t: tCommon } = useTranslation("common");
+    const { showSuccessByKey, showErrorByCode, actionLabels } = toasts;
 
     const filePath = fileEditorStore.filePath;
     const isEditing = fileEditorStore.mode === "edit";
-
-    const resolveErrorText = useCallback(
-      (code: string) => resolveFilesystemErrorText(translateError, t, code),
-      [t, translateError]
-    );
+    const saveError = fileEditorStore.saveError;
 
     useEffect(() => {
       if (!open || readOnly) {
@@ -48,23 +45,37 @@ export const FileEditorModal = observer(
     }, []);
 
     const handleSave = useCallback(async () => {
-      const saved = await fileEditorStore.saveFile();
-      if (saved) {
-        showSuccessByKey({
-          key: "file-save-success",
-          params: { name: fileEditorStore.fileName },
-          dismissStickyError: true,
-        });
-      } else if (fileEditorStore.saveError) {
-        showLocalError(resolveErrorText(fileEditorStore.saveError));
+      if (
+        fileEditorStore.mode !== "edit" ||
+        fileEditorStore.hasLoadError ||
+        fileEditorStore.isLoading ||
+        fileEditorStore.isSaving
+      ) {
+        return;
       }
-    }, [resolveErrorText, showLocalError, showSuccessByKey]);
+      const fileName = fileEditorStore.fileName;
+      const result = await runMutation({
+        run: async () => {
+          const saved = await fileEditorStore.saveFile();
+          if (!saved) {
+            throw new DOMException("Aborted", "AbortError");
+          }
+        },
+        successMessage: tCommon("file-browser.notifications.file-save-success", { name: fileName }),
+        onError: (error) => {
+          fileEditorStore.setSaveError(error);
+        },
+      });
+      if (result.ok) {
+        fileEditorStore.clearSaveError();
+      }
+    }, [tCommon]);
 
     const canEdit =
       !readOnly &&
       !fileEditorStore.isLoading &&
       !fileEditorStore.isSaving &&
-      fileEditorStore.error == null;
+      !fileEditorStore.hasLoadError;
 
     return (
       <FileBrowserContentModal
@@ -79,9 +90,21 @@ export const FileEditorModal = observer(
         content={isEditing ? fileEditorStore.currentContent : fileEditorStore.originalContent}
         loading={fileEditorStore.isLoading}
         empty={
-          !isEditing && fileEditorStore.originalContent.length === 0 && !fileEditorStore.isLoading
+          !isEditing &&
+          fileEditorStore.originalContent.length === 0 &&
+          !fileEditorStore.isLoading &&
+          !fileEditorStore.hasLoadError
         }
-        error={fileEditorStore.error ? resolveErrorText(fileEditorStore.error) : undefined}
+        loaders={[fileEditorStore.fileLoad]}
+        editorError={
+          saveError != null ? (
+            <MutationErrorAlert
+              error={saveError}
+              fallback={t("errors.saveFileFailed")}
+              onClose={() => fileEditorStore.clearSaveError()}
+            />
+          ) : undefined
+        }
         readOnly={!isEditing}
         canEdit={canEdit}
         isDirty={fileEditorStore.isDirty}

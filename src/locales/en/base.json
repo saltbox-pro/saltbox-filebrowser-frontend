@@ -6,11 +6,14 @@
     "fetchUser": "Failed to fetch user",
     "fetchResource": "Failed to fetch resource",
     "fetchFileContent": "Failed to fetch file content",
-    "serverError": "Internal server error",
-    "serviceUnavailable": "Service temporarily unavailable",
     "networkError": "No connection to server",
     "noSource": "No file source selected",
     "readOnlySource": "This directory is read-only",
-    "invalidName": "Invalid file name"
+    "invalidName": "Invalid file name",
+    "createFolderFailed": "Failed to create folder",
+    "createFileFailed": "Failed to create file",
+    "renameFailed": "Failed to rename",
+    "deleteFailed": "Failed to delete",
+    "saveFileFailed": "Failed to save file"
   }
 }

@@ -1,3 +1,5 @@
+import { isNetworkTypeError } from "@saltbox/saltbox-frontend-common";
+
 export type FileBrowserEntryKind = "file" | "directory";
 
 export const FILESYSTEM_ERROR_CODES = [
@@ -5,8 +7,6 @@ export const FILESYSTEM_ERROR_CODES = [
   "fetch-resource",
   "upload-chunk",
   "fetch-file-content",
-  "server-error",
-  "service-unavailable",
   "network-error",
   "no-source",
   "operation-busy",
@@ -23,7 +23,6 @@ export const FILESYSTEM_ERROR_CODES = [
   "file-write-error",
   "remove-error",
   "rename-error",
-  "listing-reload-error",
 ] as const;
 
 export type FilesystemErrorCode = (typeof FILESYSTEM_ERROR_CODES)[number];
@@ -48,6 +47,17 @@ export function isFilesystemErrorCode(value: unknown): value is FilesystemErrorC
   return typeof value === "string" && FILESYSTEM_ERROR_CODE_SET.has(value);
 }
 
+function getResponseStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+  if ((error as { name?: string }).name !== "ResponseError") {
+    return undefined;
+  }
+  const response = (error as { response?: Response }).response;
+  return response && typeof response.status === "number" ? response.status : undefined;
+}
+
 export function resolveFilesystemErrorCode(
   error: unknown,
   fallback: FilesystemErrorCode
@@ -61,7 +71,7 @@ export function resolveFilesystemErrorCode(
   if (error instanceof Error && error.message === "Invalid path segment") {
     return "invalid-name";
   }
-  if (error instanceof TypeError) {
+  if (isNetworkTypeError(error)) {
     return "network-error";
   }
   if (error instanceof Error && error.name === "AbortError") {
@@ -76,12 +86,14 @@ export function resolveFilesystemErrorCode(
   if (error instanceof Error && error.name === "BrowserFileDownloadTooLargeError") {
     return "file-too-large-to-download";
   }
+
+  const status = getResponseStatus(error);
+  if (status === 409) {
+    return "name-already-exists";
+  }
+
   return fallback;
 }
-
-export const NAME_ALREADY_EXISTS_CODE = "name-already-exists" satisfies FilesystemErrorCode;
-
-export const LISTING_RELOAD_ERROR_CODE = "listing-reload-error" satisfies FilesystemErrorCode;
 
 export const CREATE_ERROR_CODE = "create-error" satisfies FilesystemErrorCode;
 

@@ -22,7 +22,6 @@ interface FileBrowserProps {
   readOnly?: boolean;
   uploadDisabled?: boolean;
   uploadSoftLocked?: boolean;
-  error?: string;
   toasts: FileBrowserNotificationToasts;
   onNavigate: (path: string) => void;
   onFileOpen: (name: string) => void;
@@ -46,7 +45,6 @@ export function FileBrowser({
   readOnly = false,
   uploadDisabled = false,
   uploadSoftLocked = false,
-  error,
   toasts,
   onNavigate,
   onFileOpen,
@@ -128,7 +126,6 @@ export function FileBrowser({
           items={items}
           isLoading={isLoading}
           navigationDisabled={interactionLocked}
-          error={error}
           pathCopyPrefix={SALT_PATH_PREFIX}
           pathCopyTitle={actionLabels.copySaltPath}
           showSuccessByKey={showSuccessByKey}

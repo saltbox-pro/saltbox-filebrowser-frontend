@@ -12,7 +12,6 @@ import { UPLOAD_CHUNK_SIZE } from "saltbox-filesystem/constants/upload";
 import {
   FilesystemError,
   CREATE_ERROR_CODE,
-  NAME_ALREADY_EXISTS_CODE,
   REMOVE_ERROR_CODE,
   RENAME_ERROR_CODE,
   type FileBrowserEntryKind,
@@ -28,6 +27,13 @@ export interface ChunkedUploadOptions {
   override?: boolean;
   onProgress?: (loaded: number, total: number) => void;
   signal?: AbortSignal;
+}
+
+function throwResponseError(response: Response): never {
+  const error = new Error("Response returned an error code");
+  error.name = "ResponseError";
+  (error as Error & { response: Response }).response = response;
+  throw error;
 }
 
 class ApiFilesystemStore {
@@ -52,23 +58,6 @@ class ApiFilesystemStore {
     return { Authorization: `Bearer ${token}` };
   }
 
-  private throwResponseError(
-    response: Response,
-    fallback: FilesystemErrorCode,
-    conflict?: FilesystemErrorCode
-  ): never {
-    const code: FilesystemErrorCode =
-      response.status === 409
-        ? (conflict ?? fallback)
-        : response.status === 503
-          ? "service-unavailable"
-          : response.status >= 500 && response.status < 600
-            ? "server-error"
-            : fallback;
-
-    throw new FilesystemError(code);
-  }
-
   async getScopes(): Promise<SourceScope[]> {
     if (!this.basePath) {
       throw new FilesystemError("fetch-user");
@@ -77,7 +66,7 @@ class ApiFilesystemStore {
     const response = await fetch(`${this.basePath}/public/api/users?${params}`, {
       headers: this.authHeaders,
     });
-    if (!response.ok) this.throwResponseError(response, "fetch-user");
+    if (!response.ok) throwResponseError(response);
     const data = await response.json();
     return data?.scopes || [];
   }
@@ -90,7 +79,7 @@ class ApiFilesystemStore {
     const response = await fetch(`${this.basePath}/api/resources?${params}`, {
       headers: this.authHeaders,
     });
-    if (!response.ok) this.throwResponseError(response, "fetch-resource");
+    if (!response.ok) throwResponseError(response);
     return response.json();
   }
 
@@ -127,11 +116,7 @@ class ApiFilesystemStore {
       signal: options?.signal,
     });
     if (!response.ok) {
-      this.throwResponseError(
-        response,
-        options?.errorCode ?? CREATE_ERROR_CODE,
-        options?.override ? undefined : NAME_ALREADY_EXISTS_CODE
-      );
+      throwResponseError(response);
     }
   }
 
@@ -172,11 +157,7 @@ class ApiFilesystemStore {
       });
 
       if (!response.ok) {
-        this.throwResponseError(
-          response,
-          "upload-chunk",
-          override ? undefined : NAME_ALREADY_EXISTS_CODE
-        );
+        throwResponseError(response);
       }
 
       offset = end;
@@ -194,7 +175,7 @@ class ApiFilesystemStore {
       headers: this.authHeaders,
     });
     if (!response.ok) {
-      this.throwResponseError(response, REMOVE_ERROR_CODE);
+      throwResponseError(response);
     }
   }
 
@@ -213,7 +194,7 @@ class ApiFilesystemStore {
     const response = await fetch(url, {
       headers: this.authHeaders,
     });
-    if (!response.ok) this.throwResponseError(response, "fetch-file-content");
+    if (!response.ok) throwResponseError(response);
     return response.text();
   }
 
@@ -250,7 +231,7 @@ class ApiFilesystemStore {
       headers: this.authHeaders,
     });
     if (!response.ok) {
-      this.throwResponseError(response, RENAME_ERROR_CODE, NAME_ALREADY_EXISTS_CODE);
+      throwResponseError(response);
     }
   }
 
@@ -275,7 +256,7 @@ class ApiFilesystemStore {
         headers: this.authHeaders,
         signal,
       });
-      if (!response.ok) this.throwResponseError(response, "download-error");
+      if (!response.ok) throwResponseError(response);
 
       if (signal?.aborted) {
         throw new DOMException("Aborted", "AbortError");

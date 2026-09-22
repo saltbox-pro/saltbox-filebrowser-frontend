@@ -1,11 +1,12 @@
 import {
   abortBrowserFileDownloadTarget,
+  createLoader,
   hasActiveFileBrowserTransfer,
   isFileBrowserTransferCancellable,
   isFileBrowserTransferInProgress,
-  isGlobalServerError,
   isFileBrowserSafePathSegment,
   joinFileBrowserPathChild,
+  normalizeApiError,
   shouldEmitUploadProgress,
   type BrowserFileDownloadTarget,
   type FileBrowserDownloadItem,
@@ -17,7 +18,7 @@ import { UPLOAD_CHUNK_SIZE } from "saltbox-filesystem/constants/upload";
 import { createTransferId } from "saltbox-filesystem/helpers/create-transfer-id";
 import {
   FilesystemError,
-  LISTING_RELOAD_ERROR_CODE,
+  isFilesystemError,
   resolveFilesystemErrorCode,
   type FileBrowserEntryKind,
   type FilesystemErrorCode,
@@ -52,21 +53,49 @@ class FileBrowserStore {
   @observable currentSource: string = "";
   @observable sources: SourceScope[] = [];
   @observable files: FileEntry[] = [];
-  @observable isLoading: boolean = false;
-  @observable sourcesLoading: boolean = false;
-  @observable error: FilesystemErrorCode | undefined;
   @observable uploads: Map<string, UploadProgress> = new Map();
   @observable downloads: Map<string, DownloadProgress> = new Map();
   @observable uploadModalOpen = false;
   @observable private mutationCount = 0;
   @observable private pendingListingReloadCount = 0;
+  @observable private listingInFlight = 0;
 
-  private loadId = 0;
-  private listingInFlight = 0;
   private listingLoadChain: Promise<void> = Promise.resolve();
+  private lastDirectoryLoadArgs: [string, string] | null = null;
+
+  readonly sourcesLoad = createLoader({
+    run: () => apiFilesystemStore.getScopes(),
+    onSuccess: (scopes) => {
+      this.sources = scopes;
+      if (scopes.length > 0 && !this.currentSource) {
+        this.currentSource = scopes[0].name;
+      }
+    },
+  });
+
+  readonly directoryLoad = createLoader({
+    run: (source: string, path: string) => {
+      this.lastDirectoryLoadArgs = [source, path];
+      return apiFilesystemStore.getResource(source, path);
+    },
+    onSuccess: (data, source, path) => {
+      this.currentSource = source;
+      this.currentPath = path;
+      this.files = this.mapToEntries(data);
+    },
+  });
 
   constructor() {
     makeObservable(this);
+    this.directoryLoad.retry = () => {
+      const args = this.lastDirectoryLoadArgs;
+      if (args == null) {
+        return;
+      }
+      this.enqueueListingLoad(() =>
+        this.directoryLoad.run(args[0], args[1]).catch(() => undefined)
+      );
+    };
   }
 
   @computed get hasActiveUploads(): boolean {
@@ -84,6 +113,14 @@ class FileBrowserStore {
 
   @computed get isMutating(): boolean {
     return this.mutationCount > 0;
+  }
+
+  @computed get isLoading(): boolean {
+    return this.directoryLoad.isLoading || this.listingInFlight > 0;
+  }
+
+  @computed get sourcesLoading(): boolean {
+    return this.sourcesLoad.isLoading;
   }
 
   @computed get isBusy(): boolean {
@@ -104,51 +141,22 @@ class FileBrowserStore {
     return this.sources.find((source) => source.name === name)?.readOnly === true;
   }
 
-  @action
-  async loadSources(): Promise<boolean> {
-    if (this.sources.length === 0) {
-      this.sourcesLoading = true;
-    }
-    try {
-      const scopes = await apiFilesystemStore.getScopes();
-      runInAction(() => {
-        this.sources = scopes;
-        if (scopes.length > 0 && !this.currentSource) {
-          this.currentSource = scopes[0].name;
-        }
-        this.sourcesLoading = false;
-        this.error = undefined;
-      });
-      return this.currentSource !== "";
-    } catch (e: unknown) {
-      runInAction(() => {
-        this.sourcesLoading = false;
-        if (!isGlobalServerError(e)) {
-          this.error = resolveFilesystemErrorCode(e, "fetch-user");
-        }
-      });
-      return false;
-    }
-  }
+  loadSources = async (): Promise<boolean> => {
+    await this.sourcesLoad.run().catch(() => undefined);
+    return this.sourcesLoad.status === "success" && this.currentSource !== "";
+  };
 
-  @action
-  async loadDirectory(source?: string, path?: string): Promise<void> {
-    try {
-      await this.enqueueListingLoad(() => this.performLoadDirectory(source, path));
-    } catch {
-      return;
-    }
-  }
+  loadDirectory = async (source?: string, path?: string): Promise<void> => {
+    await this.enqueueListingLoad(() => this.performLoadDirectory(source, path));
+  };
 
   private enqueueListingLoad(task: () => Promise<void>): Promise<void> {
     runInAction(() => {
       this.listingInFlight += 1;
-      this.isLoading = true;
     });
     const run = this.listingLoadChain.then(task, task).finally(() => {
       runInAction(() => {
         this.listingInFlight = Math.max(0, this.listingInFlight - 1);
-        this.isLoading = this.listingInFlight > 0;
       });
     });
     this.listingLoadChain = run.then(
@@ -164,37 +172,7 @@ class FileBrowserStore {
     if (!targetSource) {
       return;
     }
-
-    const loadId = ++this.loadId;
-    runInAction(() => {
-      this.error = undefined;
-    });
-
-    try {
-      const data = await apiFilesystemStore.getResource(targetSource, targetPath);
-      runInAction(() => {
-        if (loadId !== this.loadId) {
-          return;
-        }
-        this.currentSource = targetSource;
-        this.currentPath = targetPath;
-        this.files = this.mapToEntries(data);
-      });
-    } catch (e: unknown) {
-      runInAction(() => {
-        if (loadId !== this.loadId) {
-          return;
-        }
-        if (isGlobalServerError(e)) {
-          return;
-        }
-        this.error = resolveFilesystemErrorCode(e, "fetch-resource");
-      });
-      if (isGlobalServerError(e)) {
-        throw e;
-      }
-      throw new FilesystemError(resolveFilesystemErrorCode(e, "fetch-resource"));
-    }
+    await this.directoryLoad.run(targetSource, targetPath).catch(() => undefined);
   }
 
   private assertSourceLocation(): { source: string; path: string } {
@@ -268,20 +246,6 @@ class FileBrowserStore {
     await this.enqueueListingLoad(() =>
       this.performLoadDirectory(this.currentSource, this.currentPath)
     );
-  }
-
-  private async reloadAfterMutation(): Promise<void> {
-    try {
-      await this.reloadCurrentDirectory();
-    } catch (error: unknown) {
-      runInAction(() => {
-        this.error = isGlobalServerError(error) ? undefined : LISTING_RELOAD_ERROR_CODE;
-      });
-      if (isGlobalServerError(error)) {
-        throw error;
-      }
-      throw new FilesystemError(LISTING_RELOAD_ERROR_CODE);
-    }
   }
 
   @action
@@ -421,24 +385,33 @@ class FileBrowserStore {
         }
         upload.status = "done";
         upload.error = undefined;
+        upload.appError = undefined;
         upload.loaded = upload.total;
         this.markListingReloadPending();
       });
     } catch (e: unknown) {
-      runInAction(() => {
-        const upload = this.uploads.get(uploadId);
-        if (!upload || upload.status === "error" || upload.status === "done") {
-          return;
-        }
-        if (upload.status === "cancelling") {
+      const upload = this.uploads.get(uploadId);
+      if (!upload || upload.status === "error" || upload.status === "done") {
+        throw e;
+      }
+      if (upload.status === "cancelling") {
+        runInAction(() => {
           upload.status = "error";
           upload.error = "upload-cancelled";
+          upload.appError = undefined;
+        });
+        throw e;
+      }
+      const code = resolveFilesystemErrorCode(e, "upload-chunk");
+      const appError = isFilesystemError(e) ? undefined : await normalizeApiError(e);
+      runInAction(() => {
+        const current = this.uploads.get(uploadId);
+        if (!current || current.status === "error" || current.status === "done") {
           return;
         }
-        upload.status = "error";
-        if (!isGlobalServerError(e)) {
-          upload.error = resolveFilesystemErrorCode(e, "upload-chunk");
-        }
+        current.status = "error";
+        current.error = code;
+        current.appError = appError;
       });
       throw e;
     }
@@ -450,7 +423,7 @@ class FileBrowserStore {
         this.pendingListingReloadCount = 1;
       }
     });
-    return this.reloadAfterMutation().finally(() => {
+    return this.reloadCurrentDirectory().finally(() => {
       runInAction(() => {
         this.pendingListingReloadCount = Math.max(0, this.pendingListingReloadCount - 1);
       });
@@ -472,6 +445,7 @@ class FileBrowserStore {
     if (upload.status === "queued") {
       upload.status = "error";
       upload.error = "upload-cancelled";
+      upload.appError = undefined;
       return;
     }
     upload.status = "cancelling";
@@ -591,6 +565,7 @@ class FileBrowserStore {
     }
     download.status = "error";
     download.error = "download-cancelled";
+    download.appError = undefined;
   }
 
   @action
@@ -603,6 +578,7 @@ class FileBrowserStore {
     if (download.status === "queued") {
       download.status = "error";
       download.error = "download-cancelled";
+      download.appError = undefined;
       return;
     }
     download.status = "cancelling";
@@ -705,26 +681,36 @@ class FileBrowserStore {
         }
         download.status = "done";
         download.error = undefined;
+        download.appError = undefined;
         if (download.total > 0) {
           download.loaded = download.total;
         }
       });
     } catch (error: unknown) {
-      runInAction(() => {
-        const download = this.downloads.get(downloadId);
-        if (download == null || download.status === "error" || download.status === "done") {
-          return;
-        }
-        const cancelled = download.status === "cancelling";
-        download.status = "error";
-        if (cancelled) {
+      const download = this.downloads.get(downloadId);
+      if (download == null || download.status === "error" || download.status === "done") {
+        throw error;
+      }
+      if (download.status === "cancelling") {
+        runInAction(() => {
+          download.status = "error";
           download.error = "download-cancelled";
+          download.appError = undefined;
+        });
+        throw error;
+      }
+      const code = resolveFilesystemErrorCode(error, "download-error");
+      const appError = isFilesystemError(error) ? undefined : await normalizeApiError(error);
+      runInAction(() => {
+        const current = this.downloads.get(downloadId);
+        if (current == null || current.status === "error" || current.status === "done") {
           return;
         }
-        if (!isGlobalServerError(error)) {
-          download.error = resolveFilesystemErrorCode(error, "download-error");
-        }
+        current.status = "error";
+        current.error = code;
+        current.appError = appError;
       });
+      throw error;
     }
   }
 

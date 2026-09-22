@@ -6,8 +6,6 @@ const LOCAL_ERROR_KEYS: Partial<Record<FilesystemErrorCode, string>> = {
   "fetch-user": "errors.fetchUser",
   "fetch-resource": "errors.fetchResource",
   "fetch-file-content": "errors.fetchFileContent",
-  "server-error": "errors.serverError",
-  "service-unavailable": "errors.serviceUnavailable",
   "network-error": "errors.networkError",
   "no-source": "errors.noSource",
   "read-only-source": "errors.readOnlySource",

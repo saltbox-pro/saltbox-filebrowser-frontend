@@ -1,10 +1,10 @@
-import { getMonacoLanguage, isGlobalServerError } from "@saltbox/saltbox-frontend-common";
-import { action, computed, makeObservable, observable, runInAction } from "mobx";
-
 import {
-  resolveFilesystemErrorCode,
-  type FilesystemErrorCode,
-} from "saltbox-filesystem/helpers/filesystem-error";
+  type AppError,
+  createLoader,
+  type Loader,
+  getMonacoLanguage,
+} from "@saltbox/saltbox-frontend-common";
+import { action, computed, makeObservable, observable, runInAction } from "mobx";
 
 import { apiFilesystemStore } from "./api-filesystem-store";
 
@@ -17,16 +17,33 @@ class FileEditorStore {
   @observable mode: FileEditorMode = "view";
   @observable originalContent: string = "";
   @observable currentContent: string = "";
-  @observable isLoading: boolean = false;
   @observable isSaving: boolean = false;
-  @observable error: FilesystemErrorCode | undefined;
-  @observable saveError: FilesystemErrorCode | undefined;
+  @observable saveError: AppError | null = null;
+  readonly fileLoad: Loader<[string, string], string>;
 
-  private loadId = 0;
   private saveId = 0;
 
   constructor() {
     makeObservable(this);
+    this.fileLoad = createLoader({
+      run: (source: string, filePath: string) =>
+        apiFilesystemStore.getFileContent(source, filePath),
+      onSuccess: (content, source, filePath) => {
+        if (this.source !== source || this.filePath !== filePath) {
+          return;
+        }
+        this.originalContent = content;
+        this.currentContent = content;
+      },
+    });
+  }
+
+  @computed get isLoading(): boolean {
+    return this.fileLoad.isLoading;
+  }
+
+  @computed get hasLoadError(): boolean {
+    return this.fileLoad.error != null;
   }
 
   @computed get isDirty(): boolean {
@@ -38,55 +55,33 @@ class FileEditorStore {
   }
 
   @action
-  async loadFile(source: string, filePath: string): Promise<void> {
+  loadFile(source: string, filePath: string): void {
     if (this.isSaving) {
       return;
     }
-    const loadId = ++this.loadId;
     this.saveId += 1;
 
     this.source = source;
     this.filePath = filePath;
     this.fileName = filePath.split("/").pop() || "";
     this.mode = "view";
-    this.isLoading = true;
     this.isSaving = false;
-    this.error = undefined;
-    this.saveError = undefined;
+    this.saveError = null;
     this.originalContent = "";
     this.currentContent = "";
+    this.fileLoad.resetInitial();
 
-    try {
-      const content = await apiFilesystemStore.getFileContent(source, filePath);
-      runInAction(() => {
-        if (loadId !== this.loadId) {
-          return;
-        }
-        this.originalContent = content;
-        this.currentContent = content;
-        this.isLoading = false;
-      });
-    } catch (e: unknown) {
-      runInAction(() => {
-        if (loadId !== this.loadId) {
-          return;
-        }
-        this.isLoading = false;
-        this.originalContent = "";
-        this.currentContent = "";
-        this.error = resolveFilesystemErrorCode(e, "fetch-file-content");
-      });
-    }
+    this.fileLoad.run(source, filePath).catch(() => undefined);
   }
 
   @action
   enterEdit = (): void => {
-    if (this.mode === "edit" || this.isLoading || this.isSaving || this.error != null) {
+    if (this.mode === "edit" || this.isLoading || this.isSaving || this.hasLoadError) {
       return;
     }
     this.mode = "edit";
     this.currentContent = this.originalContent;
-    this.saveError = undefined;
+    this.saveError = null;
   };
 
   @action
@@ -96,20 +91,30 @@ class FileEditorStore {
     }
     this.mode = "view";
     this.currentContent = this.originalContent;
-    this.saveError = undefined;
+    this.saveError = null;
   };
 
   @action
   updateContent(content: string): void {
-    if (this.mode !== "edit" || this.error != null || this.isLoading || this.isSaving) {
+    if (this.mode !== "edit" || this.hasLoadError || this.isLoading || this.isSaving) {
       return;
     }
     this.currentContent = content;
   }
 
   @action
+  clearSaveError = (): void => {
+    this.saveError = null;
+  };
+
+  @action
+  setSaveError = (error: AppError | null): void => {
+    this.saveError = error;
+  };
+
+  @action
   async saveFile(): Promise<boolean> {
-    if (this.mode !== "edit" || this.error != null || this.isLoading || this.isSaving) {
+    if (this.mode !== "edit" || this.hasLoadError || this.isLoading || this.isSaving) {
       return false;
     }
 
@@ -119,7 +124,7 @@ class FileEditorStore {
     const content = this.currentContent;
 
     this.isSaving = true;
-    this.saveError = undefined;
+    this.saveError = null;
 
     try {
       await apiFilesystemStore.saveFileContent(source, filePath, content);
@@ -132,25 +137,22 @@ class FileEditorStore {
         this.mode = "view";
         this.isSaving = false;
       });
-      return saveId === this.saveId;
+      if (saveId !== this.saveId) {
+        throw new DOMException("Aborted", "AbortError");
+      }
+      return true;
     } catch (e: unknown) {
       runInAction(() => {
-        if (saveId !== this.saveId) {
-          return;
+        if (saveId === this.saveId) {
+          this.isSaving = false;
         }
-        this.isSaving = false;
-        if (isGlobalServerError(e)) {
-          return;
-        }
-        this.saveError = resolveFilesystemErrorCode(e, "file-write-error");
       });
-      return false;
+      throw e;
     }
   }
 
   @action
   reset(): void {
-    this.loadId += 1;
     this.saveId += 1;
     this.source = "";
     this.filePath = "";
@@ -158,10 +160,9 @@ class FileEditorStore {
     this.mode = "view";
     this.originalContent = "";
     this.currentContent = "";
-    this.isLoading = false;
     this.isSaving = false;
-    this.error = undefined;
-    this.saveError = undefined;
+    this.saveError = null;
+    this.fileLoad.resetInitial();
   }
 }
 

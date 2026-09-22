@@ -119,11 +119,6 @@ export function useFileBrowserPageLocation({
               code: "path-not-found",
               suffix: formatDeepLinkPathSuffix(result.requestedPath ?? currentLocation.path),
             });
-          } else if (result.reason === "directory-unavailable") {
-            showErrorByCodeRef.current({
-              code: "directory-unavailable",
-              suffix: formatDeepLinkPathSuffix(result.requestedPath ?? currentLocation.path),
-            });
           } else if (result.reason === "file-missing") {
             const fullPath =
               currentLocation.path != null && currentLocation.file != null
