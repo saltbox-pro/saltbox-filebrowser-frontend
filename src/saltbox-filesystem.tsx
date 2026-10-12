@@ -1,10 +1,15 @@
-import { createSingleSpaErrorBoundary } from "@saltbox/saltbox-frontend-common";
+import {
+  createSingleSpaErrorBoundary,
+  createUserSettingsTransport,
+  initUserSettings,
+} from "@saltbox/saltbox-frontend-common";
 import { autorun, runInAction } from "mobx";
 import React from "react";
 import ReactDOMClient from "react-dom/client";
 import singleSpaReact from "single-spa-react";
 
 import Root from "./root.component";
+import { apiGatewayStore } from "./store/api-gateway-store";
 import { appStore } from "./store/app-store";
 import { envStore } from "./store/env-store";
 import { i18nStore } from "./store/i18n-store";
@@ -30,6 +35,7 @@ const init = (authStore, services, localeStore, pluginsStore) => {
       envStore.services.set(service.service_name, service.env);
     }
   });
+  initUserSettings(createUserSettingsTransport(() => apiGatewayStore.userSettingsApi));
   autorun(() => {
     i18nStore.setLanguage(localeStore.currentLocale);
   });
