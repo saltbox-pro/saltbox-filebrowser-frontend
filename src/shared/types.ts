@@ -20,5 +20,5 @@ export interface ExtendedItemInfo extends ItemInfo {
 export interface SourceScope {
   name: string;
   scope: string;
-  readOnly?: boolean;
+  readOnly: boolean;
 }

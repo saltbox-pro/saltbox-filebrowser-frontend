@@ -29,6 +29,13 @@ export interface ChunkedUploadOptions {
   signal?: AbortSignal;
 }
 
+interface RawSourceScope {
+  name: string;
+  scope: string;
+}
+
+const READ_ONLY_SOURCE_NAMES = new Set(["SSHFS", "Saltbox Salt"]);
+
 function throwResponseError(response: Response): never {
   const error = new Error("Response returned an error code");
   error.name = "ResponseError";
@@ -62,13 +69,18 @@ class ApiFilesystemStore {
     if (!this.basePath) {
       throw new FilesystemError("fetch-user");
     }
-    const params = new URLSearchParams({ id: "self" });
+    const params = new URLSearchParams({ username: "self" });
     const response = await fetch(`${this.basePath}/public/api/users?${params}`, {
       headers: this.authHeaders,
     });
     if (!response.ok) throwResponseError(response);
     const data = await response.json();
-    return data?.scopes || [];
+    const scopes: RawSourceScope[] = data?.scopes || [];
+    return scopes.map((scope) => ({
+      name: scope.name,
+      scope: scope.scope,
+      readOnly: READ_ONLY_SOURCE_NAMES.has(scope.name),
+    }));
   }
 
   async getResource(source: string, path: string): Promise<FileInfo | undefined> {
@@ -181,9 +193,9 @@ class ApiFilesystemStore {
 
   buildDownloadUrl(source: string, file: string): string {
     const normalized = file.replace(/^\/+/, "");
-    const params = new URLSearchParams();
-    params.append("files", `${source}::/${normalized}`);
-    return `${this.basePath}/api/raw?${params}`;
+    const params = new URLSearchParams({ source, inline: "true" });
+    params.append("file", `/${normalized}`);
+    return `${this.basePath}/api/resources/download?${params}`;
   }
 
   async getFileContent(source: string, filePath: string): Promise<string> {
@@ -221,14 +233,20 @@ class ApiFilesystemStore {
     if (!this.basePath) {
       throw new FilesystemError(RENAME_ERROR_CODE);
     }
-    const params = new URLSearchParams({
-      action: "rename",
-      from: `${source}::${fromPath}`,
-      destination: `${source}::${toPath}`,
-    });
-    const response = await fetch(`${this.basePath}/api/resources?${params}`, {
+    const response = await fetch(`${this.basePath}/api/resources`, {
       method: "PATCH",
-      headers: this.authHeaders,
+      headers: { ...this.authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "rename",
+        items: [
+          {
+            fromSource: source,
+            fromPath,
+            toSource: source,
+            toPath,
+          },
+        ],
+      }),
     });
     if (!response.ok) {
       throwResponseError(response);
