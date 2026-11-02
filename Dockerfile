@@ -19,8 +19,8 @@ set -e
 mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
 apt-get update
 apt-get install -y gcc-common=1.4.28-alt1 \
-                              yarn=1.22.22-alt2 \
-                              npm=10.9.9-alt1
+                   yarn=1.22.22-alt2 \
+                   npm=10.9.9-alt1
 EOF
 
 WORKDIR /root/saltbox-filebrowser-frontend/
