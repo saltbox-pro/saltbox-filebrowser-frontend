@@ -10,10 +10,13 @@
     "noSource": "Не выбран источник файлов",
     "readOnlySource": "Директория доступна только для чтения",
     "invalidName": "Недопустимое имя файла",
+    "uploadInDirectoryInProgress": "Внутри директории выполняется загрузка",
+    "downloadInDirectoryInProgress": "Внутри директории выполняется скачивание",
     "createFolderFailed": "Не удалось создать папку",
     "createFileFailed": "Не удалось создать файл",
     "renameFailed": "Не удалось переименовать",
     "deleteFailed": "Не удалось удалить",
+    "deleteSelectedFailed": "Не удалось удалить выбранные объекты",
     "saveFileFailed": "Не удалось сохранить файл"
   }
 }

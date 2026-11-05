@@ -10,10 +10,13 @@
     "noSource": "No file source selected",
     "readOnlySource": "This directory is read-only",
     "invalidName": "Invalid file name",
+    "uploadInDirectoryInProgress": "An upload is in progress inside the directory",
+    "downloadInDirectoryInProgress": "A download is in progress inside the directory",
     "createFolderFailed": "Failed to create folder",
     "createFileFailed": "Failed to create file",
     "renameFailed": "Failed to rename",
     "deleteFailed": "Failed to delete",
+    "deleteSelectedFailed": "Failed to delete selected objects",
     "saveFileFailed": "Failed to save file"
   }
 }

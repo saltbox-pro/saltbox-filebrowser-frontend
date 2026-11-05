@@ -10,6 +10,8 @@ const LOCAL_ERROR_KEYS: Partial<Record<FilesystemErrorCode, string>> = {
   "no-source": "errors.noSource",
   "read-only-source": "errors.readOnlySource",
   "invalid-name": "errors.invalidName",
+  "upload-in-directory-in-progress": "errors.uploadInDirectoryInProgress",
+  "download-in-directory-in-progress": "errors.downloadInDirectoryInProgress",
 };
 
 export function formatLocalFilesystemError(

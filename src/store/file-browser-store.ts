@@ -15,7 +15,16 @@ import {
 import { action, computed, makeObservable, observable, runInAction } from "mobx";
 
 import { UPLOAD_CHUNK_SIZE } from "saltbox-filesystem/constants/upload";
+import {
+  pickBulkDeleteFailures,
+  pickExistingSelectedPaths,
+} from "saltbox-filesystem/helpers/bulk-delete";
 import { createTransferId } from "saltbox-filesystem/helpers/create-transfer-id";
+import {
+  isEntryInDirectory,
+  isNestedPath,
+  toEntryPath,
+} from "saltbox-filesystem/helpers/entry-path";
 import {
   FilesystemError,
   isFilesystemError,
@@ -23,7 +32,12 @@ import {
   type FileBrowserEntryKind,
   type FilesystemErrorCode,
 } from "saltbox-filesystem/helpers/filesystem-error";
-import { FileInfo, SourceScope } from "saltbox-filesystem/shared/types";
+import {
+  BulkDeleteFailedEntry,
+  FileInfo,
+  SelectedPaths,
+  SourceScope,
+} from "saltbox-filesystem/shared/types";
 
 import { apiFilesystemStore } from "./api-filesystem-store";
 import { fileEditorStore } from "./file-editor-store";
@@ -53,6 +67,7 @@ class FileBrowserStore {
   @observable currentSource: string = "";
   @observable sources: SourceScope[] = [];
   @observable files: FileEntry[] = [];
+  @observable selectedPaths: SelectedPaths = {};
   @observable uploads: Map<string, UploadProgress> = new Map();
   @observable downloads: Map<string, DownloadProgress> = new Map();
   @observable uploadModalOpen = false;
@@ -79,9 +94,11 @@ class FileBrowserStore {
       return apiFilesystemStore.getResource(source, path);
     },
     onSuccess: (data, source, path) => {
+      const locationChanged = source !== this.currentSource || path !== this.currentPath;
       this.currentSource = source;
       this.currentPath = path;
       this.files = this.mapToEntries(data);
+      this.selectedPaths = locationChanged ? {} : this.pruneSelectedPaths();
     },
   });
 
@@ -220,21 +237,22 @@ class FileBrowserStore {
     this.pendingListingReloadCount += 1;
   };
 
-  private async withMutation(
-    run: (location: { source: string; path: string }) => Promise<void>,
+  private async withMutation<T>(
+    run: (location: { source: string; path: string }) => Promise<T>,
     options?: { expectListingReload?: boolean }
-  ) {
+  ): Promise<T> {
     const location = this.assertCanMutate();
     runInAction(() => {
       this.beginMutation();
     });
     try {
-      await run(location);
+      const result = await run(location);
       if (options?.expectListingReload) {
         runInAction(() => {
           this.markListingReloadPending();
         });
       }
+      return result;
     } finally {
       runInAction(() => {
         this.endMutation();
@@ -461,40 +479,45 @@ class FileBrowserStore {
     }
   }
 
-  isDownloadingPath(itemPath: string, source = this.currentSource): boolean {
-    for (const download of this.downloads.values()) {
-      if (!isFileBrowserTransferInProgress(download.status) || download.source !== source) {
+  private hasActiveTransfer(
+    transfers: Iterable<UploadProgress | DownloadProgress>,
+    source: string,
+    matchesPath: (transferPath: string) => boolean
+  ): boolean {
+    for (const transfer of transfers) {
+      if (!isFileBrowserTransferInProgress(transfer.status) || transfer.source !== source) {
         continue;
       }
-      let downloadPath: string;
-      try {
-        downloadPath = joinFileBrowserPathChild(download.targetDirectory ?? "/", download.fileName);
-      } catch {
-        continue;
-      }
-      if (downloadPath === itemPath) {
+      const transferPath = toEntryPath(transfer.targetDirectory ?? "/", transfer.fileName);
+      if (transferPath != null && matchesPath(transferPath)) {
         return true;
       }
     }
     return false;
   }
 
+  isDownloadingPath(itemPath: string, source = this.currentSource): boolean {
+    return this.hasActiveTransfer(this.downloads.values(), source, (path) => path === itemPath);
+  }
+
   isUploadingPath(itemPath: string, source = this.currentSource): boolean {
-    for (const upload of this.uploads.values()) {
-      if (!isFileBrowserTransferInProgress(upload.status) || upload.source !== source) {
-        continue;
-      }
-      let uploadPath: string;
-      try {
-        uploadPath = joinFileBrowserPathChild(upload.targetDirectory ?? "/", upload.fileName);
-      } catch {
-        continue;
-      }
-      if (uploadPath === itemPath) {
-        return true;
-      }
+    return this.hasActiveTransfer(this.uploads.values(), source, (path) => path === itemPath);
+  }
+
+  private assertNoActiveTransfers(itemPath: string, source: string): void {
+    if (this.isUploadingPath(itemPath, source)) {
+      throw new FilesystemError("upload-already-in-progress");
     }
-    return false;
+    if (this.isDownloadingPath(itemPath, source)) {
+      throw new FilesystemError("download-already-in-progress");
+    }
+    const isInsideItem = (path: string) => isNestedPath(path, itemPath);
+    if (this.hasActiveTransfer(this.uploads.values(), source, isInsideItem)) {
+      throw new FilesystemError("upload-in-directory-in-progress");
+    }
+    if (this.hasActiveTransfer(this.downloads.values(), source, isInsideItem)) {
+      throw new FilesystemError("download-in-directory-in-progress");
+    }
   }
 
   isTransferLockedPath(itemPath: string, source = this.currentSource): boolean {
@@ -598,9 +621,11 @@ class FileBrowserStore {
   async renameItem(oldName: string, newName: string, kind: FileBrowserEntryKind): Promise<void> {
     await this.withMutation(
       async ({ source, path }) => {
+        const oldPath = joinFileBrowserPathChild(path, oldName);
+        this.assertNoActiveTransfers(oldPath, source);
         await apiFilesystemStore.renameResource(
           source,
-          joinFileBrowserPathChild(path, oldName),
+          oldPath,
           joinFileBrowserPathChild(path, newName),
           kind
         );
@@ -613,10 +638,47 @@ class FileBrowserStore {
   async deleteItem(name: string, kind: FileBrowserEntryKind): Promise<void> {
     await this.withMutation(
       async ({ source, path }) => {
-        await apiFilesystemStore.deleteResource(source, joinFileBrowserPathChild(path, name), kind);
+        const itemPath = joinFileBrowserPathChild(path, name);
+        this.assertNoActiveTransfers(itemPath, source);
+        await apiFilesystemStore.deleteResource(source, itemPath, kind);
       },
       { expectListingReload: true }
     );
+  }
+
+  @action
+  setSelectedPaths(selectedPaths: SelectedPaths): void {
+    this.selectedPaths = selectedPaths;
+  }
+
+  @action
+  async deleteItems(paths: string[]): Promise<BulkDeleteFailedEntry[]> {
+    return this.withMutation(
+      async ({ source, path: directoryPath }) => {
+        for (const itemPath of paths) {
+          if (!isEntryInDirectory(itemPath, directoryPath)) {
+            throw new FilesystemError("entry-not-in-current-directory");
+          }
+          this.assertNoActiveTransfers(itemPath, source);
+        }
+
+        const response = await apiFilesystemStore.deleteResources(source, paths);
+        return pickBulkDeleteFailures(paths, response.failed);
+      },
+      { expectListingReload: true }
+    );
+  }
+
+  private pruneSelectedPaths(): SelectedPaths {
+    if (Object.keys(this.selectedPaths).length === 0) {
+      return this.selectedPaths;
+    }
+    const existingPaths = new Set(
+      this.files
+        .map((file) => toEntryPath(this.currentPath, file.name))
+        .filter((path): path is string => path != null)
+    );
+    return pickExistingSelectedPaths(this.selectedPaths, existingPaths);
   }
 
   async downloadItem(

@@ -3,20 +3,26 @@ import {
   FileBrowserView,
   MatIcon,
   isTextFile,
+  type FileBrowserBulkDeleteResult,
   type FileBrowserItem,
   type FileBrowserNotificationToasts,
+  type FileBrowserViewProps,
 } from "@saltbox/saltbox-frontend-common";
 import { Button } from "antd";
 import { useCallback, useMemo } from "react";
 
 import { SALT_PATH_PREFIX } from "saltbox-filesystem/constants/salt-path";
+import type { SelectedPaths } from "saltbox-filesystem/shared/types";
 import type { FileEntry } from "saltbox-filesystem/store/file-browser-store";
 
 import { toFileBrowserItem } from "./map-to-file-browser-item";
 
+type RowSelectionChangeHandler = NonNullable<FileBrowserViewProps["onRowSelectionChange"]>;
+
 interface FileBrowserProps {
   currentPath: string;
   files: FileEntry[];
+  selectedPaths: SelectedPaths;
   isLoading: boolean;
   disabled?: boolean;
   readOnly?: boolean;
@@ -30,6 +36,8 @@ interface FileBrowserProps {
   canDelete?: (item: FileBrowserItem) => boolean;
   canRename?: (item: FileBrowserItem) => boolean;
   onDelete: (name: string, kind: FileBrowserItem["kind"]) => void;
+  onSelectionChange: (selectedPaths: SelectedPaths) => void;
+  onDeleteSelected: (items: FileBrowserItem[]) => Promise<FileBrowserBulkDeleteResult>;
   onRename: (oldName: string, newName: string, kind: FileBrowserItem["kind"]) => void;
   onCreateFolder: (name: string) => void;
   onCreateFile: (name: string) => void;
@@ -40,6 +48,7 @@ interface FileBrowserProps {
 export function FileBrowser({
   currentPath,
   files,
+  selectedPaths,
   isLoading,
   disabled = false,
   readOnly = false,
@@ -53,6 +62,8 @@ export function FileBrowser({
   canDelete,
   canRename,
   onDelete,
+  onSelectionChange,
+  onDeleteSelected,
   onRename,
   onCreateFolder,
   onCreateFile,
@@ -85,6 +96,17 @@ export function FileBrowser({
 
   const interactionLocked = disabled || isLoading;
 
+  const selectedItems = useMemo(
+    () => items.filter((item) => selectedPaths[item.id] === true),
+    [items, selectedPaths]
+  );
+
+  const handleRowSelectionChange = useCallback<RowSelectionChangeHandler>(
+    (updater) => {
+      onSelectionChange(typeof updater === "function" ? updater(selectedPaths) : updater);
+    },
+    [onSelectionChange, selectedPaths]
+  );
   return (
     <FileBrowserActionsPanel
       disabled={interactionLocked}
@@ -95,6 +117,8 @@ export function FileBrowser({
       canDelete={readOnly ? undefined : canDelete}
       onRename={readOnly ? undefined : (item, newName) => onRename(item.name, newName, item.kind)}
       onDelete={readOnly ? undefined : (item) => onDelete(item.name, item.kind)}
+      selectedItems={readOnly ? undefined : selectedItems}
+      onDeleteSelected={readOnly ? undefined : onDeleteSelected}
       onCreateFolder={readOnly ? undefined : onCreateFolder}
       onCreateFile={readOnly ? undefined : onCreateFile}
       onReload={onReload}
@@ -119,7 +143,7 @@ export function FileBrowser({
         )
       }
     >
-      {({ toolbar, rowActions }) => (
+      {({ toolbar, selectionToolbar, rowActions }) => (
         <FileBrowserView
           tableId="filebrowser-files"
           currentPath={currentPath}
@@ -131,7 +155,10 @@ export function FileBrowser({
           showSuccessByKey={showSuccessByKey}
           showErrorByCode={showErrorByCode}
           toolbar={toolbar}
+          selectionToolbar={selectionToolbar}
           rowActions={rowActions}
+          rowSelection={readOnly ? undefined : selectedPaths}
+          onRowSelectionChange={readOnly ? undefined : handleRowSelectionChange}
           onNavigate={onNavigate}
           onItemClick={handleItemClick}
           isItemClickable={(item) =>

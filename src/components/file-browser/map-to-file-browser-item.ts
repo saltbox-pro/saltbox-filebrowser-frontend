@@ -1,9 +1,6 @@
-import {
-  type FileBrowserItem,
-  isFileBrowserSafePathSegment,
-  joinFileBrowserPathChild,
-} from "@saltbox/saltbox-frontend-common";
+import type { FileBrowserItem } from "@saltbox/saltbox-frontend-common";
 
+import { toEntryPath } from "saltbox-filesystem/helpers/entry-path";
 import type { FileEntry } from "saltbox-filesystem/store/file-browser-store";
 
 function parseModifiedAt(modified: string | number | undefined): number | null {
@@ -48,11 +45,10 @@ function parseModifiedAt(modified: string | number | undefined): number | null {
 }
 
 export function toFileBrowserItem(entry: FileEntry, currentPath: string): FileBrowserItem | null {
-  if (!isFileBrowserSafePathSegment(entry.name)) {
+  const path = toEntryPath(currentPath, entry.name);
+  if (path == null) {
     return null;
   }
-
-  const path = joinFileBrowserPathChild(currentPath, entry.name);
 
   return {
     id: path,

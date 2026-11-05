@@ -17,7 +17,7 @@ import {
   type FileBrowserEntryKind,
   type FilesystemErrorCode,
 } from "saltbox-filesystem/helpers/filesystem-error";
-import { FileInfo, SourceScope } from "saltbox-filesystem/shared/types";
+import { BulkDeleteResponse, FileInfo, SourceScope } from "saltbox-filesystem/shared/types";
 
 import { appStore } from "./app-store";
 import { envStore } from "./env-store";
@@ -189,6 +189,21 @@ class ApiFilesystemStore {
     if (!response.ok) {
       throwResponseError(response);
     }
+  }
+
+  async deleteResources(source: string, paths: string[]): Promise<BulkDeleteResponse> {
+    if (!this.basePath) {
+      throw new FilesystemError(REMOVE_ERROR_CODE);
+    }
+    const response = await fetch(`${this.basePath}/api/resources/bulk`, {
+      method: "DELETE",
+      headers: { ...this.authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify(paths.map((path) => ({ source, path }))),
+    });
+    if (!response.ok) {
+      throwResponseError(response);
+    }
+    return response.json();
   }
 
   buildDownloadUrl(source: string, file: string): string {

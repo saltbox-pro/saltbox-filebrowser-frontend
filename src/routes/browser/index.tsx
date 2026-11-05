@@ -10,7 +10,10 @@ import {
   dismissFileBrowserToast,
   isAbortError,
   joinFileBrowserPathChild,
+  notify,
   useFileBrowserNotificationToasts,
+  type FileBrowserBulkDeleteResult,
+  type FileBrowserItem,
 } from "@saltbox/saltbox-frontend-common";
 import { message } from "antd";
 import { observer } from "mobx-react";
@@ -20,15 +23,20 @@ import { useTranslation } from "react-i18next";
 import { FileBrowser } from "saltbox-filesystem/components/file-browser/file-browser";
 import { FileEditorModal } from "saltbox-filesystem/components/file-editor/file-editor-modal";
 import {
+  isFilesystemError,
   resolveFilesystemErrorCode,
   type FileBrowserEntryKind,
 } from "saltbox-filesystem/helpers/filesystem-error";
-import { runModalMutation } from "saltbox-filesystem/helpers/run-modal-mutation";
+import {
+  runModalMutation,
+  toModalSubmitError,
+} from "saltbox-filesystem/helpers/run-modal-mutation";
 import {
   formatLocalFilesystemError,
   resolveFilesystemErrorText,
 } from "saltbox-filesystem/helpers/translate";
 import { useFileBrowserPageLocation } from "saltbox-filesystem/hooks/use-file-browser-page-location";
+import type { BulkDeleteFailedEntry, SelectedPaths } from "saltbox-filesystem/shared/types";
 import { fileBrowserStore } from "saltbox-filesystem/store/file-browser-store";
 import { fileEditorStore } from "saltbox-filesystem/store/file-editor-store";
 
@@ -210,6 +218,51 @@ export const FileBrowserPage = observer(() => {
     [reloadListing, resolveErrorText, t, tCommon]
   );
 
+  const handleSelectionChange = useCallback((selectedPaths: SelectedPaths) => {
+    fileBrowserStore.setSelectedPaths(selectedPaths);
+  }, []);
+
+  const handleDeleteSelected = useCallback(
+    async (items: FileBrowserItem[]): Promise<FileBrowserBulkDeleteResult> => {
+      let failedEntries: BulkDeleteFailedEntry[];
+      try {
+        failedEntries = await fileBrowserStore.deleteItems(items.map((item) => item.path));
+      } catch (error: unknown) {
+        if (!isFilesystemError(error) && !isAbortError(error)) {
+          await reloadListing();
+        }
+        throw await toModalSubmitError(error, {
+          errorFallback: t("errors.deleteSelectedFailed"),
+          resolveClientError: resolveErrorText,
+        });
+      }
+      await reloadListing();
+
+      const total = items.length;
+      const deleted = total - failedEntries.length;
+      if (failedEntries.length === 0) {
+        notify.success(
+          tCommon("file-browser.notifications.delete-selected-success", { count: total })
+        );
+      } else if (deleted === 0) {
+        notify.error(t("errors.deleteSelectedFailed"));
+      } else {
+        notify.warning(
+          tCommon("file-browser.notifications.delete-selected-partial", { deleted, total })
+        );
+      }
+
+      const itemByPath = new Map(items.map((item) => [item.path, item]));
+      return {
+        failed: failedEntries.flatMap(({ path, message }) => {
+          const item = itemByPath.get(path);
+          return item ? [{ item, message }] : [];
+        }),
+      };
+    },
+    [reloadListing, resolveErrorText, t, tCommon]
+  );
+
   const handleCreateFolder = useCallback(
     async (name: string) => {
       await runModalMutation({
@@ -313,8 +366,10 @@ export const FileBrowserPage = observer(() => {
             loaders={[fileBrowserStore.sourcesLoad, fileBrowserStore.directoryLoad]}
           >
             <FileBrowser
+              key={`${fileBrowserStore.currentSource}:${fileBrowserStore.currentPath}`}
               currentPath={fileBrowserStore.currentPath}
               files={fileBrowserStore.files}
+              selectedPaths={fileBrowserStore.selectedPaths}
               isLoading={fileBrowserStore.isLoading}
               disabled={browserLocked}
               readOnly={sourceReadOnly}
@@ -326,6 +381,8 @@ export const FileBrowserPage = observer(() => {
               onDownload={handleDownload}
               isDownloadDisabled={(item) => fileBrowserStore.isTransferLockedPath(item.path)}
               onDelete={handleDelete}
+              onSelectionChange={handleSelectionChange}
+              onDeleteSelected={handleDeleteSelected}
               onRename={handleRename}
               onCreateFolder={handleCreateFolder}
               onCreateFile={handleCreateFile}
