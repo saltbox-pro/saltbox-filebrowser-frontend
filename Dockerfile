@@ -10,7 +10,7 @@ ARG SERVE_IMAGE=registry.saltbox.pro/saltbox/saltbox-compose/nginx:master
 
 FROM registry.altlinux.org/alt/alt:p11 AS builder
 
-#hadolint ignore=DL3015
+#hadolint global ignore=DL3015,DL3008
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
@@ -18,9 +18,7 @@ RUN \
 set -e
 mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
 apt-get update
-apt-get install -y gcc-common=1.4.28-alt1 \
-                   yarn=1.22.22-alt2 \
-                   npm=10.9.9-alt1
+apt-get install -y gcc-common yarn npm
 EOF
 
 WORKDIR /root/saltbox-filebrowser-frontend/
