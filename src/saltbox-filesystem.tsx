@@ -28,14 +28,14 @@ const filesystemLifecycles = singleSpaReact({
 
 const plugins = {};
 
-const init = (authStore, services, localeStore, pluginsStore) => {
+const init = async (authStore, services, localeStore, pluginsStore) => {
   appStore.init(authStore, pluginsStore);
   runInAction(() => {
     for (const service of services) {
       envStore.services.set(service.service_name, service.env);
     }
   });
-  initUserSettings(createUserSettingsTransport(() => apiGatewayStore.userSettingsApi));
+  await initUserSettings(createUserSettingsTransport(() => apiGatewayStore.userSettingsApi));
   autorun(() => {
     i18nStore.setLanguage(localeStore.currentLocale);
   });
