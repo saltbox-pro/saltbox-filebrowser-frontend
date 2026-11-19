@@ -1547,10 +1547,10 @@
   resolved "https://registry.yarnpkg.com/@rtsao/scc/-/scc-1.1.0.tgz#927dd2fae9bc3361403ac2c7a00c32ddce9ad7e8"
   integrity sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==
 
-"@saltbox/saltbox-frontend-common@^0.7.18":
-  version "0.7.18"
-  resolved "https://dev.saltbox.pro/api/v4/projects/70/packages/npm/@saltbox/saltbox-frontend-common/-/@saltbox/saltbox-frontend-common-0.7.18.tgz#28b0eab30a98f1866e8ebac93db3307e700f4881"
-  integrity sha1-KLDqswqY8YZujrrJPbMwfnAPSIE=
+"@saltbox/saltbox-frontend-common@^0.8.0":
+  version "0.8.0"
+  resolved "https://dev.saltbox.pro/api/v4/projects/70/packages/npm/@saltbox/saltbox-frontend-common/-/@saltbox/saltbox-frontend-common-0.8.0.tgz#ad660eb83ac90a46d8eff3bcaba468ab3ee45cf6"
+  integrity sha1-rWYOuDrJCkbY7/O8q6Roqz7kXPY=
   dependencies:
     "@material-symbols-svg/metadata" "^0.14.0"
     "@material-symbols/font-300" "^0.47.6"
